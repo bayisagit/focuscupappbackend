@@ -139,6 +139,7 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+WHITENOISE_MANIFEST_STRICT = False
 
 # Media files (User uploads, jerseys, photos)
 MEDIA_URL = '/media/'

@@ -12,4 +12,7 @@ python manage.py collectstatic --no-input
 echo "=== Running Database Migrations ==="
 python manage.py migrate --no-input
 
+echo "=== Seeding Initial Tournament & Manager Data ==="
+python manage.py seed_data || true
+
 echo "=== Build Complete ==="
