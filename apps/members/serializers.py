@@ -136,7 +136,7 @@ class MemberProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = MemberProfile
         fields = [
-            'first_name', 'second_name', 'primary_position',
+            'first_name', 'second_name', 'fellowship_team', 'primary_position',
             'secondary_position', 'preferred_jersey_number',
             'profile_picture', 'jersey_picture', 'bio', 'personal_chant'
         ]

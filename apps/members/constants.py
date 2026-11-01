@@ -72,6 +72,7 @@ FELLOWSHIP_TEAMS = [
     ('Media', 'Media'),
     ('Nathanism', 'Nathanism'),
     ('Action and Prayer', 'Action and Prayer'),
+    ('No Team', 'No Team'),
 ]
 
 GENDER_CHOICES = [

@@ -31,7 +31,7 @@ class SiteSetting(models.Model):
     instagram_url = models.URLField(blank=True, default="https://www.instagram.com/aastufocus/")
     youtube_url = models.URLField(blank=True, default="https://www.youtube.com/@aastufocusofficial9025")
     contact_email = models.EmailField(blank=True, default="contact@aastufocus.org")
-    contact_phone = models.CharField(max_length=50, blank=True, default="+251 900 000 000")
+    contact_phone = models.CharField(max_length=50, blank=True, default="+25191 784 1282")
 
     updated_at = models.DateTimeField(auto_now=True)
 

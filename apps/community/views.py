@@ -25,7 +25,26 @@ class GalleryAlbumListAPIView(generics.ListAPIView):
 class GalleryPhotoUploadAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    def get(self, request):
+        count = GalleryPhoto.objects.filter(uploaded_by=request.user).count()
+        is_mgr = request.user.is_manager
+        return Response({
+            'uploaded_count': count,
+            'max_allowed': 3,
+            'is_manager': is_mgr,
+            'can_upload': is_mgr or (count < 3),
+            'remaining': 'Unlimited' if is_mgr else max(0, 3 - count),
+        })
+
     def post(self, request):
+        # Enforce maximum 3 match photos for regular members
+        if not request.user.is_manager:
+            user_photo_count = GalleryPhoto.objects.filter(uploaded_by=request.user).count()
+            if user_photo_count >= 3:
+                return Response({
+                    "error": "Upload limit reached: Fellowship members can post a maximum of 3 match photos to preserve storage capacity. Tournament managers have unlimited uploads."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
         album_id = request.data.get('album')
         image = request.FILES.get('image')
         caption = request.data.get('caption', '')
@@ -47,7 +66,8 @@ class GalleryPhotoUploadAPIView(APIView):
         )
         return Response({
             'message': 'Photo uploaded successfully!' + (' Pending manager moderation.' if not request.user.is_manager else ''),
-            'photo': GalleryPhotoSerializer(photo).data
+            'photo': GalleryPhotoSerializer(photo).data,
+            'uploaded_count': GalleryPhoto.objects.filter(uploaded_by=request.user).count(),
         }, status=status.HTTP_201_CREATED)
 
 
