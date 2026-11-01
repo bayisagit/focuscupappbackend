@@ -37,12 +37,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             prof = self.user.profile
             data['user']['profile'] = {
                 'id': prof.id,
+                'first_name': prof.first_name,
+                'second_name': prof.second_name,
                 'full_name': prof.full_name,
                 'batch': prof.get_competing_batch_display() or prof.academic_year,
                 'competing_batch': prof.competing_batch,
                 'college': prof.get_college_display(),
                 'department': prof.department,
                 'fellowship_team': prof.fellowship_team,
+                'gender': prof.gender,
+                'academic_year': prof.academic_year,
+                'primary_position': prof.primary_position,
+                'secondary_position': prof.secondary_position,
+                'preferred_jersey_number': prof.preferred_jersey_number,
+                'personal_chant': prof.personal_chant,
+                'bio': prof.bio,
                 'is_football_eligible': prof.is_football_eligible,
                 'profile_picture': prof.profile_picture.url if prof.profile_picture else None,
             }
@@ -76,12 +85,21 @@ class RegisterView(APIView):
                     'is_manager': user.is_manager,
                     'profile': {
                         'id': prof.id,
+                        'first_name': prof.first_name,
+                        'second_name': prof.second_name,
                         'full_name': prof.full_name,
                         'batch': prof.get_competing_batch_display() or prof.academic_year,
                         'competing_batch': prof.competing_batch,
                         'college': prof.get_college_display(),
                         'department': prof.department,
                         'fellowship_team': prof.fellowship_team,
+                        'gender': prof.gender,
+                        'academic_year': prof.academic_year,
+                        'primary_position': prof.primary_position,
+                        'secondary_position': prof.secondary_position,
+                        'preferred_jersey_number': prof.preferred_jersey_number,
+                        'personal_chant': prof.personal_chant,
+                        'bio': prof.bio,
                         'is_football_eligible': prof.is_football_eligible,
                     }
                 }

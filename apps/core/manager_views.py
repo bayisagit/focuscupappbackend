@@ -149,6 +149,7 @@ class ManagerMemberListAPIView(generics.ListAPIView):
                 'fellowship_team': m.fellowship_team,
                 'gender': m.gender,
                 'primary_position': m.primary_position,
+                'preferred_jersey_number': m.preferred_jersey_number,
                 'is_football_eligible': m.is_football_eligible,
                 'is_suspended': m.is_suspended,
                 'followers_count': m.followers_count,
@@ -284,6 +285,77 @@ class ManagerGenerateFixturesAPIView(APIView):
         )
 
         return Response({'message': msg, 'fixtures_created': count})
+
+
+class ManagerCreateFixtureAPIView(APIView):
+    """Allows tournament managers to manually create custom fixtures (e.g., Finals, Semi-finals, special matchdays)."""
+    permission_classes = [IsTournamentManager]
+
+    def post(self, request):
+        home_team_id = request.data.get('home_team_id')
+        away_team_id = request.data.get('away_team_id')
+        match_date = request.data.get('match_date')
+        kick_off_time = request.data.get('kick_off_time', '16:00')
+        venue = request.data.get('venue', 'AASTU Main Football Field')
+        round_number = request.data.get('round_number', 1)
+        stage_or_round_name = request.data.get('stage_or_round_name', 'Finals')
+        notes = request.data.get('notes', '')
+
+        if not home_team_id or not away_team_id:
+            return Response({"error": "Please select both competing batch teams."}, status=status.HTTP_400_BAD_REQUEST)
+
+        home_team = (
+            BatchTeam.objects.filter(id=home_team_id).first()
+            if str(home_team_id).isdigit()
+            else BatchTeam.objects.filter(batch_code=home_team_id).first()
+        )
+        away_team = (
+            BatchTeam.objects.filter(id=away_team_id).first()
+            if str(away_team_id).isdigit()
+            else BatchTeam.objects.filter(batch_code=away_team_id).first()
+        )
+
+        if not home_team or not away_team:
+            return Response({"error": "One or both selected teams could not be found."}, status=status.HTTP_404_NOT_FOUND)
+
+        if home_team.id == away_team.id:
+            return Response({"error": "A batch team cannot play against itself."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not match_date:
+            return Response({"error": "Match competition date is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        season = get_active_season()
+        if not season:
+            season = Season.objects.first()
+
+        match_report_combined = f"[{stage_or_round_name}] {notes}".strip()
+
+        match = Match.objects.create(
+            season=season,
+            round_number=int(round_number) if str(round_number).isdigit() else 1,
+            home_team=home_team,
+            away_team=away_team,
+            match_date=match_date,
+            kick_off_time=kick_off_time or '16:00',
+            venue=venue or 'AASTU Main Football Field',
+            status='SCHEDULED',
+            match_report=match_report_combined,
+            created_by=request.user,
+        )
+
+        AuditLog.objects.create(
+            user=request.user,
+            action_type='CREATE',
+            model_name='Match',
+            object_id=str(match.id),
+            object_repr=f"{home_team.name} vs {away_team.name}",
+            notes=f"Manually created fixture ({stage_or_round_name}) scheduled for {match_date} at {kick_off_time}."
+        )
+
+        return Response({
+            'message': f"Fixture created successfully! {home_team.name} vs {away_team.name} ({stage_or_round_name}) on {match_date}.",
+            'match_id': match.id
+        }, status=status.HTTP_201_CREATED)
 
 
 class ManagerMatchUpdateAPIView(APIView):
