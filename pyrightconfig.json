@@ -1,0 +1,16 @@
+{
+  "include": [
+    "."
+  ],
+  "extraPaths": [
+    ".",
+    "venv/lib/python3.12/site-packages"
+  ],
+  "pythonPlatform": "Linux",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportAttributeAccessIssue": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportOperatorIssue": "none",
+  "reportMissingTypeStubs": "none"
+}
