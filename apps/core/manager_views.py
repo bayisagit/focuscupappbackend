@@ -127,7 +127,19 @@ class ManagerMemberListAPIView(generics.ListAPIView):
 
         batch = request.query_params.get('batch')
         if batch:
-            qs = qs.filter(competing_batch=batch)
+            batch_clean = batch.strip()
+            batch_code = None
+            if '2' in batch_clean: batch_code = '2ND_YEAR'
+            elif '3' in batch_clean: batch_code = '3RD_YEAR'
+            elif '4' in batch_clean: batch_code = '4TH_YEAR'
+            elif '5' in batch_clean: batch_code = '5TH_YEAR'
+
+            cond = Q(academic_year__icontains=batch_clean) | Q(competing_batch__iexact=batch_clean)
+            if batch_code:
+                cond |= Q(competing_batch=batch_code)
+            if batch_clean.lower() == 'other':
+                cond |= Q(competing_batch__isnull=True) | Q(academic_year__icontains='other') | Q(academic_year__icontains='1st')
+            qs = qs.filter(cond)
 
         college = request.query_params.get('college')
         if college:
@@ -145,6 +157,8 @@ class ManagerMemberListAPIView(generics.ListAPIView):
                 'college': m.get_college_display(),
                 'department': m.department,
                 'academic_year': m.academic_year,
+                'competing_batch': m.competing_batch,
+                'batch_code': m.competing_batch,
                 'batch': m.get_competing_batch_display() or m.academic_year,
                 'fellowship_team': m.fellowship_team,
                 'gender': m.gender,
@@ -152,6 +166,7 @@ class ManagerMemberListAPIView(generics.ListAPIView):
                 'preferred_jersey_number': m.preferred_jersey_number,
                 'is_football_eligible': m.is_football_eligible,
                 'is_suspended': m.is_suspended,
+                'is_active': (not m.is_suspended) and m.user.is_active,
                 'followers_count': m.followers_count,
                 'created_at': m.created_at,
             } for m in qs.order_by('-created_at')
@@ -166,6 +181,8 @@ class ManagerMemberSuspendToggleAPIView(APIView):
     def post(self, request, member_id):
         profile = get_object_or_404(MemberProfile.objects.select_related('user'), id=member_id)
         profile.is_suspended = not profile.is_suspended
+        profile.user.is_active = not profile.is_suspended
+        profile.user.save(update_fields=['is_active'])
         profile.save(update_fields=['is_suspended'])
 
         action = 'SUSPEND_MEMBER' if profile.is_suspended else 'REACTIVATE_MEMBER'
@@ -183,6 +200,48 @@ class ManagerMemberSuspendToggleAPIView(APIView):
         return Response({
             'message': f"Account for {profile.full_name} is now {status_text}.",
             'is_suspended': profile.is_suspended,
+            'is_active': not profile.is_suspended,
+        })
+
+
+class ManagerMemberDeleteAPIView(APIView):
+    """Permanently delete a fellowship member profile and auth user account."""
+    permission_classes = [IsTournamentManager]
+
+    def delete(self, request, member_id):
+        profile = get_object_or_404(MemberProfile.objects.select_related('user'), id=member_id)
+        target_user = profile.user
+
+        if target_user == request.user:
+            return Response(
+                {'error': 'You cannot delete your own manager account.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if target_user.is_superuser:
+            return Response(
+                {'error': 'Superuser accounts cannot be deleted from the tournament portal.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        member_name = profile.full_name
+        username = target_user.username
+
+        AuditLog.objects.create(
+            user=request.user,
+            action_type='DELETE',
+            model_name='MemberProfile',
+            object_id=str(profile.id),
+            object_repr=member_name,
+            notes=f"Member profile {member_name} (@{username}) deleted permanently by manager {request.user.username}."
+        )
+
+        # Deleting the CustomUser cascades cleanly to MemberProfile, PlayerRegistration, etc.
+        target_user.delete()
+
+        return Response({
+            'message': f'Member "{member_name}" (@{username}) has been permanently deleted.',
+            'deleted_id': member_id,
         })
 
 
@@ -503,11 +562,27 @@ class ManagerMatchEventAPIView(APIView):
         extra_minute = request.data.get('extra_minute')
         description = request.data.get('description', '')
 
-        # Validate team
-        if int(team_id) not in (match.home_team_id, match.away_team_id):
-            return Response({"error": "Selected team is not playing in this match."}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate team (with smart auto-inference from player's batch if team_id omitted)
+        if not team_id and player_id:
+            temp_p = MemberProfile.objects.filter(pk=player_id).first()
+            if temp_p:
+                if temp_p.competing_batch == match.home_team.batch_code:
+                    team_id = match.home_team_id
+                elif temp_p.competing_batch == match.away_team.batch_code:
+                    team_id = match.away_team_id
 
-        team = match.home_team if int(team_id) == match.home_team_id else match.away_team
+        if not team_id:
+            return Response({"error": "Please select which batch team (Home or Away) this incident applies to."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            team_id_int = int(team_id)
+        except (ValueError, TypeError):
+            return Response({"error": "Invalid team ID."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if team_id_int not in (match.home_team_id, match.away_team_id):
+            return Response({"error": "Selected batch team is not playing in this match."}, status=status.HTTP_400_BAD_REQUEST)
+
+        team = match.home_team if team_id_int == match.home_team_id else match.away_team
 
         # Validate player if provided
         player = None

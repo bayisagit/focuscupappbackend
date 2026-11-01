@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from apps.members.models import MemberProfile, MemberFollow, PlayerRegistration
 from apps.matches.models import MatchSquad, MatchEvent
 from apps.statistics.models import TournamentAward
@@ -60,49 +61,237 @@ class MemberProfileDetailSerializer(serializers.ModelSerializer):
         return False
 
     def get_football_stats(self, obj):
-        appearances = MatchSquad.objects.filter(
-            player=obj,
-            match__status='COMPLETED',
-            match__is_published=True
-        ).count()
-        goals = MatchEvent.objects.filter(
-            player=obj,
-            event_type='GOAL',
-            match__status='COMPLETED',
-            match__is_published=True
-        ).count()
-        assists = MatchEvent.objects.filter(
-            player=obj,
-            event_type='ASSIST',
-            match__status='COMPLETED',
-            match__is_published=True
-        ).count() + MatchEvent.objects.filter(
-            related_player=obj,
-            event_type='GOAL',
-            match__status='COMPLETED',
-            match__is_published=True
-        ).count()
-        potm = obj.potm_awards.filter(status='COMPLETED', is_published=True).count()
-        yellows = MatchEvent.objects.filter(
-            player=obj,
-            event_type='YELLOW_CARD',
-            match__status='COMPLETED',
-            match__is_published=True
-        ).count()
-        reds = MatchEvent.objects.filter(
-            player=obj,
-            event_type='RED_CARD',
-            match__status='COMPLETED',
-            match__is_published=True
-        ).count()
+        # 1. Appearances
+        squad_qs = (
+            MatchSquad.objects.filter(
+                player=obj,
+                match__status='COMPLETED',
+                match__is_published=True
+            )
+            .select_related('match', 'match__home_team', 'match__away_team', 'team')
+            .order_by('-match__match_date', '-match__kick_off_time')
+        )
+        appearances_list = []
+        for sq in squad_qs:
+            m = sq.match
+            is_home = sq.team_id == m.home_team_id
+            opp = m.away_team if is_home else m.home_team
+            appearances_list.append({
+                'id': sq.id,
+                'match_id': m.id,
+                'match_date': str(m.match_date),
+                'venue': m.venue,
+                'stage': f"Round {m.round_number}",
+                'round_number': m.round_number,
+                'team_represented': sq.team.name,
+                'team_represented_code': sq.team.batch_code,
+                'opponent_team': opp.name,
+                'opponent_nickname': opp.nickname,
+                'opponent_batch_code': opp.batch_code,
+                'jersey_number': sq.jersey_number,
+                'is_starter': sq.is_starter,
+                'role': 'Starter' if sq.is_starter else 'Substitute',
+                'home_team_name': m.home_team.name,
+                'away_team_name': m.away_team.name,
+                'home_score': m.home_score,
+                'away_score': m.away_score,
+                'scoreline': f"{m.home_team.name} {m.home_score} - {m.away_score} {m.away_team.name}",
+            })
+
+        # 2. Goals
+        goals_qs = (
+            MatchEvent.objects.filter(
+                player=obj,
+                event_type='GOAL',
+                match__status='COMPLETED',
+                match__is_published=True
+            )
+            .select_related('match', 'match__home_team', 'match__away_team', 'team', 'related_player')
+            .order_by('-match__match_date', 'minute')
+        )
+        goals_list = []
+        for ev in goals_qs:
+            m = ev.match
+            is_home = ev.team_id == m.home_team_id
+            opp = m.away_team if is_home else m.home_team
+            goals_list.append({
+                'id': ev.id,
+                'match_id': m.id,
+                'match_date': str(m.match_date),
+                'venue': m.venue,
+                'stage': f"Round {m.round_number}",
+                'round_number': m.round_number,
+                'minute': ev.minute,
+                'extra_minute': ev.extra_minute,
+                'team_represented': ev.team.name,
+                'opponent_team': opp.name,
+                'opponent_nickname': opp.nickname,
+                'opponent_batch_code': opp.batch_code,
+                'home_team_name': m.home_team.name,
+                'away_team_name': m.away_team.name,
+                'home_score': m.home_score,
+                'away_score': m.away_score,
+                'scoreline': f"{m.home_team.name} {m.home_score} - {m.away_score} {m.away_team.name}",
+                'assister_name': ev.related_player.full_name if ev.related_player else None,
+                'description': ev.description or 'Goal scored',
+            })
+
+        # 3. Assists
+        assists_ev_qs = (
+            MatchEvent.objects.filter(
+                Q(event_type='ASSIST', player=obj) | Q(event_type='GOAL', related_player=obj),
+                match__status='COMPLETED',
+                match__is_published=True
+            )
+            .select_related('match', 'match__home_team', 'match__away_team', 'team', 'player', 'related_player')
+            .order_by('-match__match_date', 'minute')
+        )
+        assists_list = []
+        for ev in assists_ev_qs:
+            m = ev.match
+            is_home = ev.team_id == m.home_team_id
+            opp = m.away_team if is_home else m.home_team
+            scorer_name = ev.player.full_name if ev.player and ev.player != obj else 'Team Goal'
+            assists_list.append({
+                'id': ev.id,
+                'match_id': m.id,
+                'match_date': str(m.match_date),
+                'venue': m.venue,
+                'stage': f"Round {m.round_number}",
+                'round_number': m.round_number,
+                'minute': ev.minute,
+                'extra_minute': ev.extra_minute,
+                'team_represented': ev.team.name,
+                'opponent_team': opp.name,
+                'opponent_nickname': opp.nickname,
+                'opponent_batch_code': opp.batch_code,
+                'home_team_name': m.home_team.name,
+                'away_team_name': m.away_team.name,
+                'home_score': m.home_score,
+                'away_score': m.away_score,
+                'scoreline': f"{m.home_team.name} {m.home_score} - {m.away_score} {m.away_team.name}",
+                'scorer_name': scorer_name,
+                'description': ev.description or 'Assisted teammate goal',
+            })
+
+        # 4. POTM Awards
+        potm_matches = (
+            obj.potm_awards.filter(
+                status='COMPLETED',
+                is_published=True
+            )
+            .select_related('home_team', 'away_team')
+            .order_by('-match_date')
+        )
+        potm_list = []
+        for m in potm_matches:
+            is_home = obj.competing_batch == m.home_team.batch_code
+            opp = m.away_team if is_home else m.home_team
+            team_rep = m.home_team if is_home else m.away_team
+            potm_list.append({
+                'id': m.id,
+                'match_id': m.id,
+                'match_date': str(m.match_date),
+                'venue': m.venue,
+                'stage': f"Round {m.round_number}",
+                'round_number': m.round_number,
+                'team_represented': team_rep.name,
+                'opponent_team': opp.name,
+                'opponent_nickname': opp.nickname,
+                'opponent_batch_code': opp.batch_code,
+                'home_team_name': m.home_team.name,
+                'away_team_name': m.away_team.name,
+                'home_score': m.home_score,
+                'away_score': m.away_score,
+                'scoreline': f"{m.home_team.name} {m.home_score} - {m.away_score} {m.away_team.name}",
+                'citation': 'Official Match MVP – Recognized for outstanding football excellence and fellowship character',
+            })
+
+        # 5. Yellow Cards
+        yellows_qs = (
+            MatchEvent.objects.filter(
+                player=obj,
+                event_type='YELLOW_CARD',
+                match__status='COMPLETED',
+                match__is_published=True
+            )
+            .select_related('match', 'match__home_team', 'match__away_team', 'team')
+            .order_by('-match__match_date', 'minute')
+        )
+        yellows_list = []
+        for ev in yellows_qs:
+            m = ev.match
+            is_home = ev.team_id == m.home_team_id
+            opp = m.away_team if is_home else m.home_team
+            yellows_list.append({
+                'id': ev.id,
+                'match_id': m.id,
+                'match_date': str(m.match_date),
+                'venue': m.venue,
+                'stage': f"Round {m.round_number}",
+                'round_number': m.round_number,
+                'minute': ev.minute,
+                'team_represented': ev.team.name,
+                'opponent_team': opp.name,
+                'opponent_nickname': opp.nickname,
+                'opponent_batch_code': opp.batch_code,
+                'home_team_name': m.home_team.name,
+                'away_team_name': m.away_team.name,
+                'home_score': m.home_score,
+                'away_score': m.away_score,
+                'scoreline': f"{m.home_team.name} {m.home_score} - {m.away_score} {m.away_team.name}",
+                'description': ev.description or 'Cautioned by referee',
+            })
+
+        # 6. Red Cards
+        reds_qs = (
+            MatchEvent.objects.filter(
+                player=obj,
+                event_type='RED_CARD',
+                match__status='COMPLETED',
+                match__is_published=True
+            )
+            .select_related('match', 'match__home_team', 'match__away_team', 'team')
+            .order_by('-match__match_date', 'minute')
+        )
+        reds_list = []
+        for ev in reds_qs:
+            m = ev.match
+            is_home = ev.team_id == m.home_team_id
+            opp = m.away_team if is_home else m.home_team
+            reds_list.append({
+                'id': ev.id,
+                'match_id': m.id,
+                'match_date': str(m.match_date),
+                'venue': m.venue,
+                'stage': f"Round {m.round_number}",
+                'round_number': m.round_number,
+                'minute': ev.minute,
+                'team_represented': ev.team.name,
+                'opponent_team': opp.name,
+                'opponent_nickname': opp.nickname,
+                'opponent_batch_code': opp.batch_code,
+                'home_team_name': m.home_team.name,
+                'away_team_name': m.away_team.name,
+                'home_score': m.home_score,
+                'away_score': m.away_score,
+                'scoreline': f"{m.home_team.name} {m.home_score} - {m.away_score} {m.away_team.name}",
+                'description': ev.description or 'Dismissed by referee',
+            })
 
         return {
-            'appearances': appearances,
-            'goals': goals,
-            'assists': assists,
-            'player_of_the_match': potm,
-            'yellow_cards': yellows,
-            'red_cards': reds,
+            'appearances': len(appearances_list),
+            'goals': len(goals_list),
+            'assists': len(assists_list),
+            'player_of_the_match': len(potm_list),
+            'yellow_cards': len(yellows_list),
+            'red_cards': len(reds_list),
+            'appearances_list': appearances_list,
+            'goals_list': goals_list,
+            'assists_list': assists_list,
+            'potm_list': potm_list,
+            'yellow_cards_list': yellows_list,
+            'red_cards_list': reds_list,
         }
 
     def get_player_registration(self, obj):

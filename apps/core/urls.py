@@ -1,9 +1,12 @@
+
+# pyrefly: ignore[untyped-import]
 from django.urls import path
 from apps.core.views import SiteSettingAPIView
 from apps.core.manager_views import (
     ManagerDashboardAPIView,
     ManagerMemberListAPIView,
     ManagerMemberSuspendToggleAPIView,
+    ManagerMemberDeleteAPIView,
     ManagerPlayerRegistrationsAPIView,
     ManagerPlayerReviewAPIView,
     ManagerGenerateFixturesAPIView,
@@ -24,6 +27,7 @@ urlpatterns = [
     path('manager/dashboard/', ManagerDashboardAPIView.as_view(), name='manager_dashboard'),
     path('manager/members/', ManagerMemberListAPIView.as_view(), name='manager_members'),
     path('manager/members/<int:member_id>/suspend/', ManagerMemberSuspendToggleAPIView.as_view(), name='manager_member_suspend'),
+    path('manager/members/<int:member_id>/delete/', ManagerMemberDeleteAPIView.as_view(), name='manager_member_delete'),
     path('manager/player-registrations/', ManagerPlayerRegistrationsAPIView.as_view(), name='manager_player_registrations'),
     path('manager/player-registrations/<int:registration_id>/review/', ManagerPlayerReviewAPIView.as_view(), name='manager_player_review'),
     path('manager/generate-fixtures/', ManagerGenerateFixturesAPIView.as_view(), name='manager_generate_fixtures'),

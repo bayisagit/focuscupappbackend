@@ -76,7 +76,7 @@ class MemberAndFollowTestCase(TestCase):
         self.prof_a = MemberProfile.objects.create(
             user=self.user_a, first_name='Abebe', second_name='Bikila',
             college='ENGINEERING', department='Software Engineering',
-            academic_year='2nd Year', fellowship_team='Ebenezer', gender='MALE'
+            academic_year='2nd Year', fellowship_team='Ebenim', gender='MALE'
         )
 
         self.user_b = User.objects.create_user(

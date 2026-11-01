@@ -65,12 +65,11 @@ ALL_YEARS = [
 ]
 
 FELLOWSHIP_TEAMS = [
-    ('Ebenezer', 'Ebenezer'),
+    ('Ebenim', 'Ebenim'),
     ('BS Team', 'BS Team'),
     ('Lady', 'Lady'),
     ('Elios', 'Elios'),
     ('Media', 'Media'),
-    ('Nathanism', 'Nathanism'),
     ('Action and Prayer', 'Action and Prayer'),
     ('No Team', 'No Team'),
 ]

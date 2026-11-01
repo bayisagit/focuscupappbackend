@@ -157,7 +157,7 @@ class Command(BaseCommand):
             # 5. Fellowship Members (Diverse batch & department mix)
             sample_members = [
                 # 2nd Year Players
-                ('yonatan_k', 'Yonatan', 'Kassahun', 'ENGINEERING', 'Software Engineering', '2nd Year', 'Ebenezer', 'MALE', 'Striker', 9, 'Jesus Is My Savior', '2ND_YEAR'),
+                ('yonatan_k', 'Yonatan', 'Kassahun', 'ENGINEERING', 'Software Engineering', '2nd Year', 'Ebenim', 'MALE', 'Striker', 9, 'Jesus Is My Savior', '2ND_YEAR'),
                 ('biruk_t', 'Biruk', 'Tadesse', 'ENGINEERING', 'Electrical Engineering', '2nd Year', 'Media', 'MALE', 'Goalkeeper', 1, 'In His Hands', '2ND_YEAR'),
                 ('marcos_g', 'Marcos', 'Getachew', 'APPLIED_SCIENCES', 'Biotechnology', '2nd Year', 'BS Team', 'MALE', 'Midfielder', 8, 'Playing for His Glory', '2ND_YEAR'),
                 ('selam_a', 'Selam', 'Alemu', 'ENGINEERING', 'Architecture', '2nd Year', 'Lady', 'FEMALE', 'Winger', 11, 'Joyful in Hope', '2ND_YEAR'),
@@ -165,19 +165,19 @@ class Command(BaseCommand):
                 # 3rd Year Players
                 ('samuel_b', 'Samuel', 'Bekele', 'ENGINEERING', 'Mechanical Engineering', '3rd Year', 'Elios', 'MALE', 'Midfielder', 10, 'Christ Above Everything', '3RD_YEAR'),
                 ('dawit_m', 'Dawit', 'Mengesha', 'ENGINEERING', 'Civil Engineering', '3rd Year', 'Action and Prayer', 'MALE', 'Defender', 4, 'Rock of Ages', '3RD_YEAR'),
-                ('natnael_s', 'Natnael', 'Shiferaw', 'APPLIED_SCIENCES', 'Food Science', '3rd Year', 'Nathanism', 'MALE', 'Striker', 7, 'One Team, One Family', '3RD_YEAR'),
+                ('natnael_s', 'Natnael', 'Shiferaw', 'APPLIED_SCIENCES', 'Food Science', '3rd Year', 'Ebenim', 'MALE', 'Striker', 7, 'One Team, One Family', '3RD_YEAR'),
                 ('martha_h', 'Martha', 'Haile', 'APPLIED_SCIENCES', 'Geology', '3rd Year', 'Lady', 'FEMALE', 'Full Back', 3, 'Faithful and True', '3RD_YEAR'),
 
                 # 4th Year Players
                 ('bereket_w', 'Bereket', 'Wolde', 'ENGINEERING', 'Electromechanical Engineering', '4th Year', 'BS Team', 'MALE', 'Attacking Midfielder', 14, 'Grace and Peace', '4TH_YEAR'),
-                ('yohannes_d', 'Yohannes', 'Daniel', 'ENGINEERING', 'Chemical Engineering', '4th Year', 'Ebenezer', 'MALE', 'Goalkeeper', 12, 'Shield of Faith', '4TH_YEAR'),
+                ('yohannes_d', 'Yohannes', 'Daniel', 'ENGINEERING', 'Chemical Engineering', '4th Year', 'Ebenim', 'MALE', 'Goalkeeper', 12, 'Shield of Faith', '4TH_YEAR'),
                 ('caleb_t', 'Caleb', 'Teklu', 'APPLIED_SCIENCES', 'Industrial Engineering', '4th Year', 'Media', 'MALE', 'Centre Back', 5, 'Standing Firm in Christ', '4TH_YEAR'),
                 ('helen_g', 'Helen', 'Girma', 'ENGINEERING', 'Environmental Engineering', '4th Year', 'Action and Prayer', 'FEMALE', 'Midfielder', 6, 'Light of the World', '4TH_YEAR'),
 
                 # 5th Year Players (Engineering Only!)
-                ('ezra_a', 'Ezra', 'Assefa', 'ENGINEERING', 'Software Engineering', '5th Year', 'Nathanism', 'MALE', 'Striker', 11, 'Finishing Strong in Grace', '5TH_YEAR'),
+                ('ezra_a', 'Ezra', 'Assefa', 'ENGINEERING', 'Software Engineering', '5th Year', 'Ebenim', 'MALE', 'Striker', 11, 'Finishing Strong in Grace', '5TH_YEAR'),
                 ('mulugeta_b', 'Mulugeta', 'Beyene', 'ENGINEERING', 'Mining Engineering', '5th Year', 'Elios', 'MALE', 'Midfielder', 8, 'Humble in Victory', '5TH_YEAR'),
-                ('yared_k', 'Yared', 'Kebede', 'ENGINEERING', 'Civil Engineering', '5th Year', 'Ebenezer', 'MALE', 'Defender', 2, 'Pillar of Truth', '5TH_YEAR'),
+                ('yared_k', 'Yared', 'Kebede', 'ENGINEERING', 'Civil Engineering', '5th Year', 'Ebenim', 'MALE', 'Defender', 2, 'Pillar of Truth', '5TH_YEAR'),
 
                 # Community-only member: 1st Year (Concentrating on academics!)
                 ('abel_f', 'Abel', 'Fikre', 'ENGINEERING', 'Civil Engineering', '1st Year', 'BS Team', 'MALE', 'Other', None, 'Studying Diligently in Christ', None),
