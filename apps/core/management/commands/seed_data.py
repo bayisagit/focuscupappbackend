@@ -29,6 +29,11 @@ class Command(BaseCommand):
             site_setting.tagline = "Winning is a bonus; friendship, joy, and fellowship come first!"
             site_setting.verse_text = "Behold, how good and how pleasant it is for brethren to dwell together in unity!"
             site_setting.verse_reference = "Psalm 133:1"
+            site_setting.facebook_url = "https://web.facebook.com/fstufocus"
+            site_setting.telegram_url = "https://t.me/fstufocus"
+            site_setting.tiktok_url = "https://www.tiktok.com/@aastu_focus?lang=en"
+            site_setting.instagram_url = "https://www.instagram.com/aastufocus/"
+            site_setting.youtube_url = "https://www.youtube.com/@aastufocusofficial9025"
             site_setting.save()
 
             # 2. Superuser / Manager

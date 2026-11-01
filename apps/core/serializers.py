@@ -7,7 +7,7 @@ class SiteSettingSerializer(serializers.ModelSerializer):
         model = SiteSetting
         fields = [
             'id', 'site_title', 'tagline', 'about_fellowship',
-            'verse_text', 'verse_reference', 'telegram_url',
-            'facebook_url', 'youtube_url', 'instagram_url',
-            'contact_email', 'contact_phone', 'updated_at'
+            'verse_text', 'verse_reference', 'facebook_url',
+            'telegram_url', 'tiktok_url', 'instagram_url',
+            'youtube_url', 'contact_email', 'contact_phone', 'updated_at'
         ]

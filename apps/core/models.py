@@ -25,10 +25,11 @@ class SiteSetting(models.Model):
     verse_reference = models.CharField(max_length=100, default="Psalm 133:1")
 
     # Configurable social and contact links
-    telegram_url = models.URLField(blank=True, default="https://t.me/AASTUFocusFellowship")
-    facebook_url = models.URLField(blank=True, default="https://facebook.com/AASTUFocusFellowship")
-    youtube_url = models.URLField(blank=True, default="https://youtube.com/@AASTUFocusFellowship")
-    instagram_url = models.URLField(blank=True, default="")
+    facebook_url = models.URLField(blank=True, default="https://web.facebook.com/fstufocus")
+    telegram_url = models.URLField(blank=True, default="https://t.me/fstufocus")
+    tiktok_url = models.URLField(blank=True, default="https://www.tiktok.com/@aastu_focus?lang=en")
+    instagram_url = models.URLField(blank=True, default="https://www.instagram.com/aastufocus/")
+    youtube_url = models.URLField(blank=True, default="https://www.youtube.com/@aastufocusofficial9025")
     contact_email = models.EmailField(blank=True, default="contact@aastufocus.org")
     contact_phone = models.CharField(max_length=50, blank=True, default="+251 900 000 000")
 
