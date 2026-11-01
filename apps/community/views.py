@@ -47,10 +47,14 @@ class GalleryPhotoUploadAPIView(APIView):
 
         album_id = request.data.get('album')
         image = request.FILES.get('image')
+        image_url = request.data.get('image_url', '').strip()
         caption = request.data.get('caption', '')
 
-        if not album_id or not image:
-            return Response({"error": "Album ID and image are required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not album_id or (not image and not image_url):
+            return Response(
+                {"error": "Album ID and photo (file upload or Cloudinary URL) are required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             album = GalleryAlbum.objects.get(pk=album_id)
@@ -59,7 +63,8 @@ class GalleryPhotoUploadAPIView(APIView):
 
         photo = GalleryPhoto.objects.create(
             album=album,
-            image=image,
+            image=image if image else None,
+            image_url=image_url if image_url else '',
             caption=caption,
             uploaded_by=request.user,
             is_approved=request.user.is_manager  # Auto-approve if manager, else pending review

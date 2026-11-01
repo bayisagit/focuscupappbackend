@@ -55,8 +55,25 @@ class GalleryAlbum(models.Model):
 
 class GalleryPhoto(models.Model):
     album = models.ForeignKey(GalleryAlbum, on_delete=models.CASCADE, related_name='photos')
-    image = models.ImageField(upload_to='gallery/photos/')
+    image = models.ImageField(upload_to='gallery/photos/', null=True, blank=True)
+    image_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Cloudinary CDN URL for shared match or fellowship photo"
+    )
     caption = models.CharField(max_length=255, blank=True, default='')
+
+    @property
+    def photo_url(self):
+        if self.image_url:
+            return self.image_url
+        if self.image:
+            try:
+                return self.image.url
+            except Exception:
+                return str(self.image)
+        return ''
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,

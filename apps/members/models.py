@@ -48,6 +48,12 @@ class MemberProfile(models.Model):
         help_text="Desired squad jersey number"
     )
     profile_picture = models.ImageField(upload_to='profiles/', null=True, blank=True)
+    profile_picture_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Cloudinary CDN URL for profile photo"
+    )
     jersey_picture = models.ImageField(upload_to='jerseys/', null=True, blank=True)
     bio = models.TextField(blank=True, default='')
     personal_chant = models.CharField(
@@ -90,6 +96,17 @@ class MemberProfile(models.Model):
     @property
     def full_name(self):
         return f"{self.first_name} {self.second_name}".strip()
+
+    @property
+    def avatar_url(self):
+        if self.profile_picture_url:
+            return self.profile_picture_url
+        if self.profile_picture:
+            try:
+                return self.profile_picture.url
+            except Exception:
+                return str(self.profile_picture)
+        return None
 
     def clean(self):
         super().clean()

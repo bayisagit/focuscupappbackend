@@ -13,6 +13,7 @@ class MemberProfileListSerializer(serializers.ModelSerializer):
     college_display = serializers.CharField(source='get_college_display', read_only=True)
     batch_display = serializers.CharField(source='get_competing_batch_display', read_only=True)
     is_following = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
 
     class Meta:
         model = MemberProfile
@@ -21,9 +22,12 @@ class MemberProfileListSerializer(serializers.ModelSerializer):
             'college', 'college_display', 'department', 'academic_year',
             'batch_display', 'competing_batch', 'fellowship_team', 'gender',
             'primary_position', 'preferred_jersey_number', 'profile_picture',
-            'personal_chant', 'followers_count', 'following_count',
+            'profile_picture_url', 'personal_chant', 'followers_count', 'following_count',
             'is_football_eligible', 'is_following', 'created_at'
         ]
+
+    def get_profile_picture(self, obj):
+        return obj.avatar_url
 
     def get_is_following(self, obj):
         request = self.context.get('request')
@@ -37,6 +41,7 @@ class MemberProfileDetailSerializer(serializers.ModelSerializer):
     college_display = serializers.CharField(source='get_college_display', read_only=True)
     batch_display = serializers.CharField(source='get_competing_batch_display', read_only=True)
     is_following = serializers.SerializerMethodField()
+    profile_picture = serializers.SerializerMethodField()
     football_stats = serializers.SerializerMethodField()
     player_registration = serializers.SerializerMethodField()
     awards = serializers.SerializerMethodField()
@@ -48,11 +53,14 @@ class MemberProfileDetailSerializer(serializers.ModelSerializer):
             'college', 'college_display', 'department', 'academic_year',
             'batch_display', 'competing_batch', 'fellowship_team', 'gender',
             'primary_position', 'secondary_position', 'preferred_jersey_number',
-            'profile_picture', 'jersey_picture', 'bio', 'personal_chant',
+            'profile_picture', 'profile_picture_url', 'jersey_picture', 'bio', 'personal_chant',
             'followers_count', 'following_count', 'is_football_eligible',
             'is_following', 'football_stats', 'player_registration',
             'awards', 'created_at'
         ]
+
+    def get_profile_picture(self, obj):
+        return obj.avatar_url
 
     def get_is_following(self, obj):
         request = self.context.get('request')
@@ -327,7 +335,7 @@ class MemberProfileUpdateSerializer(serializers.ModelSerializer):
         fields = [
             'first_name', 'second_name', 'fellowship_team', 'primary_position',
             'secondary_position', 'preferred_jersey_number',
-            'profile_picture', 'jersey_picture', 'bio', 'personal_chant'
+            'profile_picture', 'profile_picture_url', 'jersey_picture', 'bio', 'personal_chant'
         ]
 
 

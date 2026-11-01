@@ -18,10 +18,14 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
 class GalleryPhotoSerializer(serializers.ModelSerializer):
     uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
+    image = serializers.SerializerMethodField()
 
     class Meta:
         model = GalleryPhoto
-        fields = ['id', 'album', 'image', 'caption', 'uploaded_by_name', 'created_at']
+        fields = ['id', 'album', 'image', 'image_url', 'caption', 'uploaded_by_name', 'created_at']
+
+    def get_image(self, obj):
+        return obj.photo_url
 
 
 class GalleryAlbumSerializer(serializers.ModelSerializer):
@@ -33,7 +37,7 @@ class GalleryAlbumSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'description', 'cover_photo', 'photo_count', 'photos', 'created_at']
 
     def get_photos(self, obj):
-        approved = obj.photos.filter(is_approved=True).order_by('-created_at')[:12]
+        approved = obj.photos.filter(is_approved=True).order_by('-created_at')[:50]
         return GalleryPhotoSerializer(approved, many=True).data
 
     def get_photo_count(self, obj):
