@@ -429,38 +429,315 @@ class ManagerCreateFixtureAPIView(APIView):
 
 
 class ManagerMatchUpdateAPIView(APIView):
-    """Update match metadata, draft score, or status."""
+    """
+    Update fixture schedule, venue, status, competing batch teams, draft score, or match report.
+    Allows managers to reschedule, postpone, cancel, or modify tournament fixtures.
+    """
     permission_classes = [IsTournamentManager]
 
     def patch(self, request, match_id):
-        match = get_object_or_404(Match, pk=match_id)
+        return self._update(request, match_id)
 
+    def put(self, request, match_id):
+        return self._update(request, match_id)
+
+    def _update(self, request, match_id):
+        match = get_object_or_404(
+            Match.objects.select_related('home_team', 'away_team', 'season'),
+            pk=match_id
+        )
+
+        match_date = request.data.get('match_date')
+        kick_off_time = request.data.get('kick_off_time')
+        venue = request.data.get('venue')
+        round_number = request.data.get('round_number')
+        home_team_id = request.data.get('home_team_id')
+        away_team_id = request.data.get('away_team_id')
         home_score = request.data.get('home_score')
         away_score = request.data.get('away_score')
         match_status = request.data.get('status')
         match_report = request.data.get('match_report')
+        stage_or_round_name = request.data.get('stage_or_round_name')
+        notes = request.data.get('notes')
         potm_id = request.data.get('player_of_the_match_id')
 
+        # Competing team modifications
+        if home_team_id is not None:
+            new_home = (
+                BatchTeam.objects.filter(id=home_team_id).first()
+                if str(home_team_id).isdigit()
+                else BatchTeam.objects.filter(batch_code=home_team_id).first()
+            )
+            if new_home:
+                match.home_team = new_home
+
+        if away_team_id is not None:
+            new_away = (
+                BatchTeam.objects.filter(id=away_team_id).first()
+                if str(away_team_id).isdigit()
+                else BatchTeam.objects.filter(batch_code=away_team_id).first()
+            )
+            if new_away:
+                match.away_team = new_away
+
+        if match.home_team_id == match.away_team_id:
+            return Response(
+                {"error": "Home team and away team cannot be the same batch."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if match_date:
+            match.match_date = match_date
+        if kick_off_time:
+            match.kick_off_time = kick_off_time
+        if venue:
+            match.venue = venue
+        if round_number is not None and str(round_number).isdigit():
+            match.round_number = int(round_number)
         if home_score is not None:
             match.home_score = int(home_score)
         if away_score is not None:
             match.away_score = int(away_score)
         if match_status:
             match.status = match_status
-        if match_report is not None:
+
+        if stage_or_round_name or notes:
+            stage = stage_or_round_name or ''
+            note_text = notes or ''
+            if stage:
+                match.match_report = f"[{stage}] {note_text}".strip()
+            elif note_text:
+                match.match_report = note_text
+        elif match_report is not None:
             match.match_report = match_report
+
         if potm_id:
             match.player_of_the_match = MemberProfile.objects.filter(pk=potm_id).first()
+        elif potm_id == '':
+            match.player_of_the_match = None
 
         match.updated_by = request.user
         match.save()
 
+        AuditLog.objects.create(
+            user=request.user,
+            action_type='UPDATE',
+            model_name='Match',
+            object_id=str(match.id),
+            object_repr=f"{match.home_team.name} vs {match.away_team.name}",
+            notes=f"Fixture #{match.id} schedule / details updated by manager {request.user.username}."
+        )
+
         return Response({
-            'message': 'Match updated successfully.',
+            'message': f"Fixture #{match.id} updated successfully.",
             'id': match.id,
+            'match_date': str(match.match_date),
+            'kick_off_time': str(match.kick_off_time)[:5],
+            'venue': match.venue,
+            'round_number': match.round_number,
+            'home_team': {
+                'id': match.home_team.id,
+                'name': match.home_team.name,
+                'batch_code': match.home_team.batch_code,
+                'nickname': match.home_team.nickname,
+            },
+            'away_team': {
+                'id': match.away_team.id,
+                'name': match.away_team.name,
+                'batch_code': match.away_team.batch_code,
+                'nickname': match.away_team.nickname,
+            },
             'home_score': match.home_score,
             'away_score': match.away_score,
             'status': match.status,
+            'match_report': match.match_report,
+        })
+
+
+class ManagerMatchSquadAPIView(APIView):
+    """
+    Manage team squad selections and starting line-ups for a match.
+    GET: Retrieve available eligible batch players and current squad selections.
+    POST / PUT: Save official team line-ups (starters, goalkeeper, substitutes, jersey numbers).
+    """
+    permission_classes = [IsTournamentManager]
+
+    def get(self, request, match_id):
+        match = get_object_or_404(
+            Match.objects.select_related('home_team', 'away_team', 'season'),
+            pk=match_id
+        )
+
+        def get_team_eligible_players(team):
+            reg_players = PlayerRegistration.objects.filter(
+                batch_team=team,
+                status='APPROVED'
+            ).select_related('member', 'member__user')
+
+            seen_member_ids = set()
+            players_list = []
+
+            for reg in reg_players:
+                m = reg.member
+                seen_member_ids.add(m.id)
+                players_list.append({
+                    'id': m.id,
+                    'member_id': m.id,
+                    'full_name': m.full_name,
+                    'username': m.user.username,
+                    'position': reg.preferred_position or m.primary_position or 'Player',
+                    'jersey_number': reg.jersey_number or m.preferred_jersey_number or None,
+                    'department': m.department,
+                    'academic_year': m.academic_year,
+                    'avatar_url': m.profile_picture_url or (m.profile_picture.url if m.profile_picture else None),
+                    'is_approved_registration': True,
+                })
+
+            fallback_members = MemberProfile.objects.filter(
+                competing_batch=team.batch_code,
+                is_suspended=False
+            ).exclude(id__in=seen_member_ids).select_related('user')
+
+            for m in fallback_members:
+                players_list.append({
+                    'id': m.id,
+                    'member_id': m.id,
+                    'full_name': m.full_name,
+                    'username': m.user.username,
+                    'position': m.primary_position or 'Player',
+                    'jersey_number': m.preferred_jersey_number or None,
+                    'department': m.department,
+                    'academic_year': m.academic_year,
+                    'avatar_url': m.profile_picture_url or (m.profile_picture.url if m.profile_picture else None),
+                    'is_approved_registration': False,
+                })
+
+            players_list.sort(key=lambda p: (0 if p['is_approved_registration'] else 1, p['full_name']))
+            return players_list
+
+        home_eligible = get_team_eligible_players(match.home_team)
+        away_eligible = get_team_eligible_players(match.away_team)
+
+        home_squad_entries = MatchSquad.objects.filter(
+            match=match,
+            team=match.home_team
+        ).select_related('player', 'player__user')
+
+        away_squad_entries = MatchSquad.objects.filter(
+            match=match,
+            team=match.away_team
+        ).select_related('player', 'player__user')
+
+        def serialize_squad(entries):
+            return [
+                {
+                    'id': s.id,
+                    'player_id': s.player_id,
+                    'player_name': s.player.full_name,
+                    'player_username': s.player.user.username,
+                    'jersey_number': s.jersey_number,
+                    'is_starter': s.is_starter,
+                    'is_goalkeeper': s.is_goalkeeper,
+                    'position': s.player.primary_position or 'Player',
+                    'avatar_url': s.player.profile_picture_url or (s.player.profile_picture.url if s.player.profile_picture else None),
+                }
+                for s in entries
+            ]
+
+        return Response({
+            'match': {
+                'id': match.id,
+                'round_number': match.round_number,
+                'match_date': str(match.match_date),
+                'kick_off_time': str(match.kick_off_time)[:5],
+                'venue': match.venue,
+                'status': match.status,
+                'match_report': match.match_report,
+                'home_team': {
+                    'id': match.home_team.id,
+                    'name': match.home_team.name,
+                    'batch_code': match.home_team.batch_code,
+                    'nickname': match.home_team.nickname,
+                    'color_hex': match.home_team.color_hex,
+                },
+                'away_team': {
+                    'id': match.away_team.id,
+                    'name': match.away_team.name,
+                    'batch_code': match.away_team.batch_code,
+                    'nickname': match.away_team.nickname,
+                    'color_hex': match.away_team.color_hex,
+                },
+            },
+            'home_eligible_players': home_eligible,
+            'away_eligible_players': away_eligible,
+            'home_squad': serialize_squad(home_squad_entries),
+            'away_squad': serialize_squad(away_squad_entries),
+        })
+
+    def post(self, request, match_id):
+        match = get_object_or_404(
+            Match.objects.select_related('home_team', 'away_team'),
+            pk=match_id
+        )
+
+        home_squad_data = request.data.get('home_squad')
+        away_squad_data = request.data.get('away_squad')
+
+        with transaction.atomic():
+            if home_squad_data is not None:
+                MatchSquad.objects.filter(match=match, team=match.home_team).delete()
+                for item in home_squad_data:
+                    player_id = item.get('player_id') or item.get('player')
+                    player = MemberProfile.objects.filter(pk=player_id).first()
+                    if player:
+                        if not player.competing_batch:
+                            player.competing_batch = match.home_team.batch_code
+                            player.save(update_fields=['competing_batch'])
+                        jersey = item.get('jersey_number') or player.preferred_jersey_number or 99
+                        MatchSquad.objects.create(
+                            match=match,
+                            team=match.home_team,
+                            player=player,
+                            jersey_number=int(jersey),
+                            is_starter=bool(item.get('is_starter', True)),
+                            is_goalkeeper=bool(item.get('is_goalkeeper', False)),
+                        )
+
+            if away_squad_data is not None:
+                MatchSquad.objects.filter(match=match, team=match.away_team).delete()
+                for item in away_squad_data:
+                    player_id = item.get('player_id') or item.get('player')
+                    player = MemberProfile.objects.filter(pk=player_id).first()
+                    if player:
+                        if not player.competing_batch:
+                            player.competing_batch = match.away_team.batch_code
+                            player.save(update_fields=['competing_batch'])
+                        jersey = item.get('jersey_number') or player.preferred_jersey_number or 99
+                        MatchSquad.objects.create(
+                            match=match,
+                            team=match.away_team,
+                            player=player,
+                            jersey_number=int(jersey),
+                            is_starter=bool(item.get('is_starter', True)),
+                            is_goalkeeper=bool(item.get('is_goalkeeper', False)),
+                        )
+
+            AuditLog.objects.create(
+                user=request.user,
+                action_type='UPDATE',
+                model_name='MatchSquad',
+                object_id=str(match.id),
+                object_repr=f"{match.home_team.name} vs {match.away_team.name}",
+                notes=f"Manager {request.user.username} updated official match lineups/squads."
+            )
+
+        home_entries = MatchSquad.objects.filter(match=match, team=match.home_team).count()
+        away_entries = MatchSquad.objects.filter(match=match, team=match.away_team).count()
+
+        return Response({
+            'message': f"Official match line-ups saved successfully! ({home_entries} {match.home_team.name} players, {away_entries} {match.away_team.name} players)",
+            'home_count': home_entries,
+            'away_count': away_entries,
         })
 
 
