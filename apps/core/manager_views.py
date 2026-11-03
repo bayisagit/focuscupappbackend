@@ -1110,3 +1110,18 @@ class ManagerExportAPIView(APIView):
             pass
 
         return response
+
+
+class ManagerMigrateAPIView(APIView):
+    """Executes database migrations and returns output for maintenance and synchronization."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from io import StringIO
+        from django.core.management import call_command
+        out = StringIO()
+        try:
+            call_command('migrate', interactive=False, stdout=out)
+            return Response({"status": "success", "output": out.getvalue()})
+        except Exception as e:
+            return Response({"status": "error", "error": str(e), "output": out.getvalue()}, status=500)

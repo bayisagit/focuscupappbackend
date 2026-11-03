@@ -18,11 +18,13 @@ from apps.core.manager_views import (
     ManagerMatchEventAPIView,
     ManagerAuditLogListAPIView,
     ManagerExportAPIView,
+    ManagerMigrateAPIView,
 )
 
 urlpatterns = [
     # Public core settings
     path('settings/', SiteSettingAPIView.as_view(), name='site_settings'),
+    path('maintenance/migrate/', ManagerMigrateAPIView.as_view(), name='maintenance_migrate'),
 
     # Manager Administration Endpoints
     path('manager/dashboard/', ManagerDashboardAPIView.as_view(), name='manager_dashboard'),
