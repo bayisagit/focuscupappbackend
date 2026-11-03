@@ -6,12 +6,14 @@ from apps.members.models import MemberProfile, PlayerRegistration
 class BatchTeamSerializer(serializers.ModelSerializer):
     total_members = serializers.SerializerMethodField()
     approved_players = serializers.SerializerMethodField()
+    photo_url = serializers.CharField(read_only=True)
 
     class Meta:
         model = BatchTeam
         fields = [
             'id', 'batch_code', 'name', 'nickname', 'color_hex',
-            'logo', 'team_photo', 'motto', 'description',
+            'logo', 'logo_url', 'team_photo', 'team_photo_url', 'photo_url',
+            'motto', 'description',
             'is_competing', 'total_members', 'approved_players', 'created_at'
         ]
 

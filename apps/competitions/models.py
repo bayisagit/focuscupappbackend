@@ -57,7 +57,19 @@ class BatchTeam(models.Model):
     nickname = models.CharField(max_length=100, blank=True, default='', help_text="e.g. Joyful Warriors")
     color_hex = models.CharField(max_length=10, default='#10B981')
     logo = models.ImageField(upload_to='batch_logos/', null=True, blank=True)
+    logo_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Cloudinary CDN URL for batch crest/logo"
+    )
     team_photo = models.ImageField(upload_to='batch_photos/', null=True, blank=True)
+    team_photo_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Cloudinary CDN URL for batch team/group photo"
+    )
     motto = models.CharField(max_length=255, blank=True, default="United in Christ, Strong in Fellowship")
     description = models.TextField(blank=True, default='')
     is_competing = models.BooleanField(
@@ -73,6 +85,24 @@ class BatchTeam(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.get_batch_code_display()})"
+
+    @property
+    def photo_url(self):
+        if self.team_photo_url and str(self.team_photo_url).strip():
+            return str(self.team_photo_url).strip()
+        if self.team_photo:
+            try:
+                return self.team_photo.url
+            except Exception:
+                return str(self.team_photo)
+        if self.logo_url and str(self.logo_url).strip():
+            return str(self.logo_url).strip()
+        if self.logo:
+            try:
+                return self.logo.url
+            except Exception:
+                return str(self.logo)
+        return None
 
 
 class SeasonTeam(models.Model):

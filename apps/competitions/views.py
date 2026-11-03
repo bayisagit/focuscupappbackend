@@ -3,11 +3,12 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
+from apps.core.permissions import IsTournamentManager
 from apps.competitions.models import Season, BatchTeam
 from apps.competitions.serializers import SeasonSerializer, BatchTeamSerializer
 from apps.statistics.services import calculate_season_standings, get_active_season
 from apps.members.models import MemberProfile, PlayerRegistration
-from apps.matches.models import Match
+from apps.matches.models import Match, AuditLog
 
 
 class SeasonListAPIView(generics.ListAPIView):
@@ -48,7 +49,33 @@ class BatchTeamListAPIView(generics.ListAPIView):
 
 class BatchTeamDetailAPIView(APIView):
     """Detailed information, roster, fixtures, and results for an academic batch."""
-    permission_classes = [permissions.AllowAny]
+    def get_permissions(self):
+        if self.request.method in ('PATCH', 'PUT'):
+            return [IsTournamentManager()]
+        return [permissions.AllowAny()]
+
+    def patch(self, request, batch_code):
+        team = get_object_or_404(BatchTeam, batch_code=batch_code)
+        
+        for field in ['name', 'nickname', 'motto', 'description', 'color_hex', 'team_photo_url', 'logo_url']:
+            if field in request.data:
+                setattr(team, field, request.data[field])
+        
+        team.save()
+
+        AuditLog.objects.create(
+            user=request.user,
+            action_type='UPDATE',
+            model_name='BatchTeam',
+            object_id=str(team.id),
+            object_repr=f"{team.name} ({team.batch_code})",
+            notes=f"Batch profile updated by manager {request.user.username}."
+        )
+
+        return Response({
+            'message': f"Batch team {team.name} updated successfully.",
+            'team': BatchTeamSerializer(team).data
+        })
 
     def get(self, request, batch_code):
         team = get_object_or_404(BatchTeam, batch_code=batch_code)
