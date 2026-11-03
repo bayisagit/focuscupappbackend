@@ -79,6 +79,9 @@ class ManagerDashboardAPIView(APIView):
                 'full_name': m.full_name,
                 'batch': m.get_competing_batch_display() or m.academic_year,
                 'department': m.department,
+                'profile_picture': m.avatar_url,
+                'avatar_url': m.avatar_url,
+                'profile_picture_url': m.profile_picture_url,
                 'created_at': m.created_at,
             } for m in recent_members
         ]
@@ -164,6 +167,9 @@ class ManagerMemberListAPIView(generics.ListAPIView):
                 'gender': m.gender,
                 'primary_position': m.primary_position,
                 'preferred_jersey_number': m.preferred_jersey_number,
+                'profile_picture': m.avatar_url,
+                'avatar_url': m.avatar_url,
+                'profile_picture_url': m.profile_picture_url,
                 'is_football_eligible': m.is_football_eligible,
                 'is_suspended': m.is_suspended,
                 'is_active': (not m.is_suspended) and m.user.is_active,

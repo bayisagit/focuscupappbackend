@@ -36,7 +36,7 @@ class MatchSquadSerializer(serializers.ModelSerializer):
         ]
 
     def get_player_photo(self, obj):
-        return obj.player.profile_picture.url if obj.player.profile_picture else None
+        return obj.player.avatar_url
 
 
 class MatchListSerializer(serializers.ModelSerializer):
@@ -93,6 +93,8 @@ class MatchDetailSerializer(serializers.ModelSerializer):
             'username': potm.user.username,
             'full_name': potm.full_name,
             'batch': potm.get_competing_batch_display(),
-            'profile_picture': potm.profile_picture.url if potm.profile_picture else None,
+            'profile_picture': potm.avatar_url,
+            'avatar_url': potm.avatar_url,
+            'profile_picture_url': potm.profile_picture_url,
             'personal_chant': potm.personal_chant,
         }

@@ -53,7 +53,9 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 'personal_chant': prof.personal_chant,
                 'bio': prof.bio,
                 'is_football_eligible': prof.is_football_eligible,
-                'profile_picture': prof.profile_picture.url if prof.profile_picture else None,
+                'profile_picture': prof.avatar_url,
+                'avatar_url': prof.avatar_url,
+                'profile_picture_url': prof.profile_picture_url,
             }
         return data
 
@@ -131,7 +133,9 @@ class CurrentUserView(APIView):
                 'primary_position': prof.primary_position,
                 'secondary_position': prof.secondary_position,
                 'preferred_jersey_number': prof.preferred_jersey_number,
-                'profile_picture': prof.profile_picture.url if prof.profile_picture else None,
+                'profile_picture': prof.avatar_url,
+                'avatar_url': prof.avatar_url,
+                'profile_picture_url': prof.profile_picture_url,
                 'jersey_picture': prof.jersey_picture.url if prof.jersey_picture else None,
                 'bio': prof.bio,
                 'personal_chant': prof.personal_chant,

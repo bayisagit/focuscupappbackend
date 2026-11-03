@@ -198,7 +198,9 @@ def get_top_goalscorers(season_id=None, limit=10):
                 'department': prof.department,
                 'position': prof.primary_position or "Forward",
                 'jersey_number': prof.preferred_jersey_number,
-                'profile_picture': prof.profile_picture.url if prof.profile_picture else None,
+                'profile_picture': prof.avatar_url,
+                'avatar_url': prof.avatar_url,
+                'profile_picture_url': prof.profile_picture_url,
                 'goals': item['total_goals'],
             })
 
@@ -249,7 +251,9 @@ def get_top_assists(season_id=None, limit=10):
                 'batch': prof.get_competing_batch_display() or prof.academic_year,
                 'department': prof.department,
                 'position': prof.primary_position or "Midfielder",
-                'profile_picture': prof.profile_picture.url if prof.profile_picture else None,
+                'profile_picture': prof.avatar_url,
+                'avatar_url': prof.avatar_url,
+                'profile_picture_url': prof.profile_picture_url,
                 'assists': total,
             })
 
@@ -279,7 +283,9 @@ def get_most_followed_members(limit=10, batch_code=None):
             'department': p.department,
             'fellowship_team': p.fellowship_team,
             'followers_count': p.followers_count,
-            'profile_picture': p.profile_picture.url if p.profile_picture else None,
+            'profile_picture': p.avatar_url,
+            'avatar_url': p.avatar_url,
+            'profile_picture_url': p.profile_picture_url,
             'personal_chant': p.personal_chant,
         })
     return results

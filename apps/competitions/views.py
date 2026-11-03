@@ -69,7 +69,9 @@ class BatchTeamDetailAPIView(APIView):
                 'department': reg.member.department,
                 'jersey_number': reg.jersey_number,
                 'position': reg.preferred_position,
-                'profile_picture': reg.member.profile_picture.url if reg.member.profile_picture else None,
+                'profile_picture': reg.member.avatar_url,
+                'avatar_url': reg.member.avatar_url,
+                'profile_picture_url': reg.member.profile_picture_url,
                 'personal_chant': reg.member.personal_chant,
             } for reg in roster_entries
         ]

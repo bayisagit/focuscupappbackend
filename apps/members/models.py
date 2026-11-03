@@ -99,8 +99,8 @@ class MemberProfile(models.Model):
 
     @property
     def avatar_url(self):
-        if self.profile_picture_url:
-            return self.profile_picture_url
+        if self.profile_picture_url and str(self.profile_picture_url).strip():
+            return str(self.profile_picture_url).strip()
         if self.profile_picture:
             try:
                 return self.profile_picture.url

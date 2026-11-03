@@ -94,7 +94,7 @@ class Command(BaseCommand):
                 {
                     'batch_code': '4TH_YEAR',
                     'name': '4th Year Batch',
-                    'nickname': 'The Shepherds',
+                    'nickname': 'The Eagles',
                     'color_hex': '#8B5CF6',
                     'motto': 'Guiding with Love and Grace',
                     'description': 'Experienced and resilient, demonstrating Christ-like humility on and off the pitch.',

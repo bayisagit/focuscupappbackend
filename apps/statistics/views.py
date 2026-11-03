@@ -73,7 +73,9 @@ class AwardsListAPIView(APIView):
                     'id': a.recipient_member.id,
                     'full_name': a.recipient_member.full_name,
                     'batch': a.recipient_member.get_competing_batch_display(),
-                    'profile_picture': a.recipient_member.profile_picture.url if a.recipient_member.profile_picture else None,
+                    'profile_picture': a.recipient_member.avatar_url if a.recipient_member else None,
+                    'avatar_url': a.recipient_member.avatar_url if a.recipient_member else None,
+                    'profile_picture_url': a.recipient_member.profile_picture_url if a.recipient_member else '',
                 } if a.recipient_member else None,
                 'recipient_team': {
                     'id': a.recipient_team.id,
