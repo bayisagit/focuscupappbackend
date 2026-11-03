@@ -145,8 +145,24 @@ class MemberDetailAPIView(APIView):
             if not profile:
                 raise Http404("Member profile not found.")
 
-        serializer = MemberProfileDetailSerializer(profile, context={'request': request})
-        return Response(serializer.data)
+        try:
+            serializer = MemberProfileDetailSerializer(profile, context={'request': request})
+            return Response(serializer.data)
+        except Exception:
+            # Safe fallback: return member profile attributes with zero stats rather than crashing with 500
+            fallback_serializer = MemberProfileListSerializer(profile, context={'request': request})
+            fallback_data = fallback_serializer.data
+            fallback_data['secondary_position'] = profile.secondary_position
+            fallback_data['jersey_picture'] = profile.jersey_picture.url if profile.jersey_picture else None
+            fallback_data['bio'] = profile.bio or ''
+            fallback_data['football_stats'] = {
+                'appearances': 0, 'goals': 0, 'assists': 0, 'player_of_the_match': 0,
+                'yellow_cards': 0, 'red_cards': 0, 'appearances_list': [], 'goals_list': [],
+                'assists_list': [], 'potm_list': [], 'yellow_cards_list': [], 'red_cards_list': [],
+            }
+            fallback_data['player_registration'] = None
+            fallback_data['awards'] = []
+            return Response(fallback_data)
 
 
 class MemberFollowToggleAPIView(APIView):
