@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.db import transaction
 from django.db.models import Q, F
 from django.shortcuts import get_object_or_404
+from django.http import Http404
 from django.contrib.auth import get_user_model
 from apps.members.models import MemberProfile, MemberFollow, PlayerRegistration
 from apps.members.serializers import (
@@ -122,18 +123,27 @@ class MemberDetailAPIView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def get(self, request, identifier):
-        if identifier.isdigit():
+        import urllib.parse
+        clean_identifier = urllib.parse.unquote(str(identifier)).strip()
+
+        if clean_identifier.isdigit():
             profile = get_object_or_404(
                 MemberProfile.objects.select_related('user'),
-                id=int(identifier),
+                id=int(clean_identifier),
                 is_suspended=False
             )
         else:
-            profile = get_object_or_404(
-                MemberProfile.objects.select_related('user'),
-                user__username=identifier,
-                is_suspended=False
+            profile = (
+                MemberProfile.objects.select_related('user').filter(
+                    Q(user__username=clean_identifier) |
+                    Q(user__username=identifier) |
+                    Q(user__username__iexact=clean_identifier) |
+                    Q(user__username__iexact=identifier),
+                    is_suspended=False
+                ).first()
             )
+            if not profile:
+                raise Http404("Member profile not found.")
 
         serializer = MemberProfileDetailSerializer(profile, context={'request': request})
         return Response(serializer.data)
