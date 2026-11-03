@@ -20,6 +20,13 @@ class Announcement(models.Model):
     category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='TOURNAMENT')
     priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='NORMAL')
     content = models.TextField()
+    image = models.ImageField(upload_to='announcements/', null=True, blank=True)
+    image_url = models.CharField(
+        max_length=500,
+        blank=True,
+        default='',
+        help_text="Cloudinary CDN URL for graphic design flyer/banner"
+    )
     is_pinned = models.BooleanField(default=False, help_text="Pinned announcements appear at the top of the homepage")
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -36,6 +43,17 @@ class Announcement(models.Model):
 
     def __str__(self):
         return f"[{self.get_priority_display()}] {self.title}"
+
+    @property
+    def photo_url(self):
+        if self.image_url and str(self.image_url).strip():
+            return str(self.image_url).strip()
+        if self.image:
+            try:
+                return self.image.url
+            except Exception:
+                return str(self.image)
+        return ''
 
 
 class GalleryAlbum(models.Model):

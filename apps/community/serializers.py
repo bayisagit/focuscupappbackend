@@ -6,12 +6,15 @@ class AnnouncementSerializer(serializers.ModelSerializer):
     author_name = serializers.CharField(source='author.get_full_name', read_only=True)
     category_display = serializers.CharField(source='get_category_display', read_only=True)
     priority_display = serializers.CharField(source='get_priority_display', read_only=True)
+    photo_url = serializers.CharField(read_only=True, allow_null=True)
+    image_url = serializers.CharField(required=False, allow_blank=True, default='')
 
     class Meta:
         model = Announcement
         fields = [
             'id', 'title', 'category', 'category_display',
-            'priority', 'priority_display', 'content', 'is_pinned',
+            'priority', 'priority_display', 'content',
+            'image_url', 'photo_url', 'is_pinned',
             'author_name', 'created_at'
         ]
 
