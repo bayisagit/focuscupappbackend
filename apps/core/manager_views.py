@@ -980,48 +980,133 @@ class ManagerExportAPIView(APIView):
     """Export platform data to CSV format for tournament administration."""
     permission_classes = [IsTournamentManager]
 
+    def perform_authentication(self, request):
+        super().perform_authentication(request)
+        # Fallback to query parameter token for direct browser downloads or <a download> links
+        token = request.query_params.get('token')
+        if (not request.user or not request.user.is_authenticated) and token:
+            try:
+                from rest_framework_simplejwt.tokens import AccessToken
+                from django.contrib.auth import get_user_model
+                access = AccessToken(token)
+                User = get_user_model()
+                user = User.objects.get(id=access['user_id'])
+                if user.is_active and user.is_manager:
+                    request.user = user
+            except Exception:
+                pass
+
     def get(self, request, data_type):
-        response = HttpResponse(content_type='text/csv')
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = f'attachment; filename="focus_cup_{data_type}.csv"'
+        # Write UTF-8 BOM so Microsoft Excel and Google Sheets correctly recognize UTF-8 characters and columns
+        response.write('\ufeff')
         writer = csv.writer(response)
 
         if data_type == 'members':
-            writer.writerow(['ID', 'Username', 'Email', 'Full Name', 'College', 'Department', 'Year', 'Fellowship Team', 'Gender', 'Eligible for Football', 'Followers'])
-            for m in MemberProfile.objects.select_related('user').all():
+            writer.writerow([
+                'ID', 'Username', 'Email', 'Full Name', 'College', 'Department',
+                'Academic Year', 'Batch Team', 'Fellowship Team', 'Gender',
+                'Primary Position', 'Eligible for Football', 'Approval Status', 'Followers Count'
+            ])
+            for m in MemberProfile.objects.select_related('user').order_by('id'):
                 writer.writerow([
-                    m.id, m.user.username, m.user.email, m.full_name,
-                    m.get_college_display(), m.department, m.academic_year,
-                    m.fellowship_team, m.gender, 'Yes' if m.is_football_eligible else 'No',
+                    m.id,
+                    m.user.username if m.user else '',
+                    m.user.email if m.user else '',
+                    m.full_name,
+                    m.get_college_display(),
+                    m.department,
+                    m.academic_year,
+                    m.get_competing_batch_display() if m.competing_batch else 'None',
+                    m.fellowship_team,
+                    m.gender,
+                    m.primary_position or 'None',
+                    'Yes' if m.is_football_eligible else 'No',
+                    'Approved' if m.is_approved else 'Pending',
                     m.followers_count
                 ])
 
         elif data_type == 'rosters':
-            writer.writerow(['Registration ID', 'Batch Team', 'Player Name', 'Jersey Number', 'Position', 'Status'])
-            for r in PlayerRegistration.objects.select_related('batch_team', 'member').all():
+            writer.writerow([
+                'Registration ID', 'Season', 'Batch Team', 'Player Name', 'Username',
+                'College', 'Department', 'Academic Year', 'Jersey Number', 'Position', 'Status', 'Registered At'
+            ])
+            for r in PlayerRegistration.objects.select_related('batch_team', 'member__user', 'season').order_by('batch_team__batch_code', 'jersey_number'):
                 writer.writerow([
-                    r.id, r.batch_team.name, r.member.full_name,
-                    r.jersey_number, r.preferred_position, r.status
+                    r.id,
+                    r.season.name if r.season else '',
+                    r.batch_team.name if r.batch_team else '',
+                    r.member.full_name if r.member else '',
+                    r.member.user.username if r.member and r.member.user else '',
+                    r.member.get_college_display() if r.member else '',
+                    r.member.department if r.member else '',
+                    r.member.academic_year if r.member else '',
+                    r.jersey_number,
+                    r.preferred_position,
+                    r.get_status_display() if hasattr(r, 'get_status_display') else r.status,
+                    r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else ''
                 ])
 
         elif data_type == 'matches':
-            writer.writerow(['Match ID', 'Date', 'Round', 'Home Team', 'Away Team', 'Home Score', 'Away Score', 'Status', 'Published'])
-            for m in Match.objects.select_related('home_team', 'away_team').all():
+            writer.writerow([
+                'Match ID', 'Season', 'Date', 'Time', 'Round', 'Venue',
+                'Home Team', 'Away Team', 'Home Score', 'Away Score',
+                'Scoreline', 'Status', 'Official Match Published'
+            ])
+            for m in Match.objects.select_related('home_team', 'away_team', 'season').order_by('match_date', 'kick_off_time'):
+                scoreline = f"{m.home_score} - {m.away_score}" if m.status == 'COMPLETED' else 'vs'
                 writer.writerow([
-                    m.id, m.match_date, m.round_number, m.home_team.name,
-                    m.away_team.name, m.home_score, m.away_score, m.status,
+                    m.id,
+                    m.season.name if m.season else '',
+                    m.match_date,
+                    m.kick_off_time.strftime('%H:%M') if m.kick_off_time else '',
+                    f"Round {m.round_number}",
+                    m.venue,
+                    m.home_team.name if m.home_team else '',
+                    m.away_team.name if m.away_team else '',
+                    m.home_score if m.status == 'COMPLETED' else '',
+                    m.away_score if m.status == 'COMPLETED' else '',
+                    scoreline,
+                    m.get_status_display() if hasattr(m, 'get_status_display') else m.status,
                     'Yes' if m.is_published else 'No'
                 ])
 
         elif data_type == 'standings':
-            writer.writerow(['Position', 'Batch', 'Played', 'Won', 'Drawn', 'Lost', 'Goals For', 'Goals Against', 'Goal Difference', 'Points'])
+            writer.writerow([
+                'Position', 'Batch Team', 'Nickname', 'Played (P)', 'Won (W)',
+                'Drawn (D)', 'Lost (L)', 'Goals For (GF)', 'Goals Against (GA)',
+                'Goal Difference (GD)', 'Points (Pts)'
+            ])
             standings = calculate_season_standings()
             for s in standings:
                 writer.writerow([
-                    s['position'], s['name'], s['played'], s['won'], s['drawn'],
-                    s['lost'], s['goals_for'], s['goals_against'], s['goal_difference'], s['points']
+                    s['position'],
+                    s['name'],
+                    s.get('nickname') or '',
+                    s['played'],
+                    s['won'],
+                    s['drawn'],
+                    s['lost'],
+                    s['goals_for'],
+                    s['goals_against'],
+                    s['goal_difference'],
+                    s['points']
                 ])
 
         else:
             return Response({"error": "Invalid export type. Choose members, rosters, matches, or standings."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Record export action in audit log
+        try:
+            AuditLog.objects.create(
+                user=request.user,
+                action_type='EXPORT',
+                model_name='Export',
+                object_repr=f"Exported {data_type} CSV",
+                notes=f"Generated {data_type} CSV report by {request.user.username}"
+            )
+        except Exception:
+            pass
 
         return response
