@@ -8,12 +8,52 @@ from apps.community.serializers import (
     GalleryPhotoSerializer,
     NotificationSerializer,
 )
+from apps.core.permissions import IsTournamentManager
+from apps.accounts.models import CustomUser
+from apps.matches.models import AuditLog
 
 
-class AnnouncementListAPIView(generics.ListAPIView):
+class AnnouncementListAPIView(generics.ListCreateAPIView):
     serializer_class = AnnouncementSerializer
-    permission_classes = [permissions.AllowAny]
     queryset = Announcement.objects.all().order_by('-is_pinned', '-created_at')
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsTournamentManager()]
+        return [permissions.AllowAny()]
+
+    def perform_create(self, serializer):
+        announcement = serializer.save(author=self.request.user)
+
+        # Broadcast notification to all active fellowship members
+        try:
+            active_users = CustomUser.objects.filter(is_active=True).exclude(pk=self.request.user.pk)
+            notifs = [
+                Notification(
+                    recipient=u,
+                    actor=self.request.user,
+                    verb=f"shared a fellowship announcement: '{announcement.title}'",
+                    target_url="/#announcements"
+                )
+                for u in active_users
+            ]
+            if notifs:
+                Notification.objects.bulk_create(notifs)
+        except Exception:
+            pass
+
+        # Audit log entry
+        try:
+            AuditLog.objects.create(
+                user=self.request.user,
+                action_type='CREATE',
+                model_name='Announcement',
+                object_id=str(announcement.id),
+                object_repr=announcement.title,
+                notes=f"Fellowship announcement published by manager {self.request.user.username}."
+            )
+        except Exception:
+            pass
 
 
 class GalleryAlbumListAPIView(generics.ListAPIView):
