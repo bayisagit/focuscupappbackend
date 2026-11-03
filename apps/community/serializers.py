@@ -14,7 +14,7 @@ class AnnouncementSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'title', 'category', 'category_display',
             'priority', 'priority_display', 'content',
-            'image_url', 'photo_url', 'is_pinned',
+            'image_url', 'photo_url', 'is_pinned', 'is_active',
             'author_name', 'created_at'
         ]
 

@@ -1,6 +1,7 @@
 from django.urls import path
 from apps.community.views import (
     AnnouncementListAPIView,
+    AnnouncementDetailAPIView,
     GalleryAlbumListAPIView,
     GalleryPhotoUploadAPIView,
     NotificationListAPIView,
@@ -8,6 +9,7 @@ from apps.community.views import (
 
 urlpatterns = [
     path('announcements/', AnnouncementListAPIView.as_view(), name='community_announcements'),
+    path('announcements/<int:pk>/', AnnouncementDetailAPIView.as_view(), name='community_announcement_detail'),
     path('gallery/', GalleryAlbumListAPIView.as_view(), name='community_gallery'),
     path('gallery/upload/', GalleryPhotoUploadAPIView.as_view(), name='community_gallery_upload'),
     path('notifications/', NotificationListAPIView.as_view(), name='community_notifications'),

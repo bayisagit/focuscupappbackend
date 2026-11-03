@@ -15,7 +15,12 @@ from apps.matches.models import AuditLog
 
 class AnnouncementListAPIView(generics.ListCreateAPIView):
     serializer_class = AnnouncementSerializer
-    queryset = Announcement.objects.all().order_by('-is_pinned', '-created_at')
+
+    def get_queryset(self):
+        user = self.request.user
+        if user and user.is_authenticated and getattr(user, 'is_manager', False):
+            return Announcement.objects.all().order_by('-is_pinned', '-created_at')
+        return Announcement.objects.filter(is_active=True).order_by('-is_pinned', '-created_at')
 
     def get_permissions(self):
         if self.request.method == 'POST':
@@ -51,6 +56,44 @@ class AnnouncementListAPIView(generics.ListCreateAPIView):
                 object_id=str(announcement.id),
                 object_repr=announcement.title,
                 notes=f"Fellowship announcement published by manager {self.request.user.username}."
+            )
+        except Exception:
+            pass
+
+
+class AnnouncementDetailAPIView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve, update (suspend/activate, pin/unpin, edit), or permanently delete an announcement."""
+    serializer_class = AnnouncementSerializer
+    permission_classes = [IsTournamentManager]
+    queryset = Announcement.objects.all()
+
+    def perform_destroy(self, instance):
+        title = instance.title
+        instance_id = str(instance.id)
+        instance.delete()
+        try:
+            AuditLog.objects.create(
+                user=self.request.user,
+                action_type='DELETE',
+                model_name='Announcement',
+                object_id=instance_id,
+                object_repr=title,
+                notes=f"Announcement '{title}' deleted by manager {self.request.user.username}."
+            )
+        except Exception:
+            pass
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        try:
+            status_desc = f"active={instance.is_active}, pinned={instance.is_pinned}"
+            AuditLog.objects.create(
+                user=self.request.user,
+                action_type='UPDATE',
+                model_name='Announcement',
+                object_id=str(instance.id),
+                object_repr=instance.title,
+                notes=f"Announcement '{instance.title}' updated ({status_desc}) by manager {self.request.user.username}."
             )
         except Exception:
             pass

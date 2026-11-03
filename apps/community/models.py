@@ -28,6 +28,10 @@ class Announcement(models.Model):
         help_text="Cloudinary CDN URL for graphic design flyer/banner"
     )
     is_pinned = models.BooleanField(default=False, help_text="Pinned announcements appear at the top of the homepage")
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Active announcements are visible publicly; suspended ones are hidden."
+    )
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
