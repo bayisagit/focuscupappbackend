@@ -6,7 +6,9 @@ from apps.members.models import MemberProfile, PlayerRegistration
 class BatchTeamSerializer(serializers.ModelSerializer):
     total_members = serializers.SerializerMethodField()
     approved_players = serializers.SerializerMethodField()
-    photo_url = serializers.CharField(read_only=True)
+    photo_url = serializers.CharField(read_only=True, allow_null=True)
+    logo_url = serializers.CharField(read_only=True, allow_null=True)
+    team_photo_url = serializers.CharField(read_only=True, allow_null=True)
 
     class Meta:
         model = BatchTeam
@@ -18,12 +20,18 @@ class BatchTeamSerializer(serializers.ModelSerializer):
         ]
 
     def get_total_members(self, obj):
-        if obj.batch_code == 'OTHER':
-            return MemberProfile.objects.filter(academic_year='Other', is_approved=True).count()
-        return MemberProfile.objects.filter(competing_batch=obj.batch_code, is_approved=True).count()
+        try:
+            if obj.batch_code == 'OTHER':
+                return MemberProfile.objects.filter(academic_year='Other', is_approved=True).count()
+            return MemberProfile.objects.filter(competing_batch=obj.batch_code, is_approved=True).count()
+        except Exception:
+            return 0
 
     def get_approved_players(self, obj):
-        return PlayerRegistration.objects.filter(batch_team=obj, status='APPROVED').count()
+        try:
+            return PlayerRegistration.objects.filter(batch_team=obj, status='APPROVED').count()
+        except Exception:
+            return 0
 
 
 class SeasonSerializer(serializers.ModelSerializer):

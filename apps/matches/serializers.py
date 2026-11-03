@@ -42,8 +42,8 @@ class MatchSquadSerializer(serializers.ModelSerializer):
 class MatchListSerializer(serializers.ModelSerializer):
     home_team = BatchTeamSerializer(read_only=True)
     away_team = BatchTeamSerializer(read_only=True)
-    season_name = serializers.CharField(source='season.name', read_only=True)
-    potm_name = serializers.CharField(source='player_of_the_match.full_name', read_only=True)
+    season_name = serializers.SerializerMethodField()
+    potm_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Match
@@ -54,11 +54,23 @@ class MatchListSerializer(serializers.ModelSerializer):
             'is_published', 'potm_name', 'created_at'
         ]
 
+    def get_season_name(self, obj):
+        try:
+            return obj.season.name if obj.season else None
+        except Exception:
+            return None
+
+    def get_potm_name(self, obj):
+        try:
+            return obj.player_of_the_match.full_name if obj.player_of_the_match else None
+        except Exception:
+            return None
+
 
 class MatchDetailSerializer(serializers.ModelSerializer):
     home_team = BatchTeamSerializer(read_only=True)
     away_team = BatchTeamSerializer(read_only=True)
-    season_name = serializers.CharField(source='season.name', read_only=True)
+    season_name = serializers.SerializerMethodField()
     events = MatchEventSerializer(many=True, read_only=True)
     home_squad = serializers.SerializerMethodField()
     away_squad = serializers.SerializerMethodField()
@@ -75,6 +87,12 @@ class MatchDetailSerializer(serializers.ModelSerializer):
             'player_of_the_match', 'player_of_the_match_details',
             'created_at', 'updated_at'
         ]
+
+    def get_season_name(self, obj):
+        try:
+            return obj.season.name if obj.season else None
+        except Exception:
+            return None
 
     def get_home_squad(self, obj):
         entries = MatchSquad.objects.filter(match=obj, team=obj.home_team).select_related('player', 'player__user')
