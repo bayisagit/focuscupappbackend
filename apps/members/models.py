@@ -205,14 +205,32 @@ class PlayerRegistration(models.Model):
 
     def clean(self):
         # Strict validation: Member must be football eligible and batch team must match competing batch
-        if not self.member.is_football_eligible:
+        if hasattr(self, 'member') and self.member and not self.member.is_football_eligible:
             raise ValidationError("This member is not eligible for tournament football rosters.")
 
-        if self.member.competing_batch != self.batch_team.batch_code:
-            raise ValidationError(
-                f"Member's academic batch '{self.member.get_competing_batch_display()}' "
-                f"does not match team batch '{self.batch_team.name}'."
-            )
+        if hasattr(self, 'member') and self.member and hasattr(self, 'batch_team') and self.batch_team:
+            if self.member.competing_batch != self.batch_team.batch_code:
+                raise ValidationError(
+                    f"Member's academic batch '{self.member.get_competing_batch_display()}' "
+                    f"does not match team batch '{self.batch_team.name}'."
+                )
+
+        # Unique jersey number within the same batch team for this season (APPROVED or PENDING)
+        if self.jersey_number and getattr(self, 'batch_team_id', None) and getattr(self, 'season_id', None):
+            if self.status in ('APPROVED', 'PENDING'):
+                conflict = PlayerRegistration.objects.filter(
+                    batch_team=self.batch_team,
+                    season=self.season,
+                    jersey_number=self.jersey_number,
+                    status__in=['APPROVED', 'PENDING']
+                ).exclude(pk=self.pk)
+                if conflict.exists():
+                    taken = conflict.first()
+                    taken_name = taken.member.full_name if taken.member else "another player"
+                    raise ValidationError(
+                        f"Jersey number #{self.jersey_number} is already taken in {self.batch_team.name} ({taken_name}). "
+                        f"Please choose another number."
+                    )
 
     def __str__(self):
         return f"{self.member.full_name} (#{self.jersey_number}) - {self.batch_team.name} ({self.status})"

@@ -304,9 +304,9 @@ class ApplyPlayerRegistrationAPIView(APIView):
 
         # Check existing registration
         existing = PlayerRegistration.objects.filter(member=profile, season=active_season).first()
-        if existing:
+        if existing and existing.status in ('PENDING', 'APPROVED'):
             return Response(
-                {"error": f"You already have a {existing.status.lower()} registration for {active_season.name}."},
+                {"error": f"You already have an active ({existing.get_status_display().lower()}) registration for {active_season.name} with jersey #{existing.jersey_number}."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -318,22 +318,152 @@ class ApplyPlayerRegistrationAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
+        # Validate requested jersey number
+        raw_jersey = request.data.get('jersey_number') or profile.preferred_jersey_number or 10
+        try:
+            jersey_number = int(raw_jersey)
+            if jersey_number < 1 or jersey_number > 99:
+                return Response(
+                    {"error": "Jersey number must be between 1 and 99."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        except (ValueError, TypeError):
+            return Response(
+                {"error": "Please provide a valid jersey number between 1 and 99."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Check if jersey number is already taken in this specific batch team
+        taken_qs = PlayerRegistration.objects.filter(
+            batch_team=batch_team,
+            season=active_season,
+            jersey_number=jersey_number,
+            status__in=['APPROVED', 'PENDING']
+        )
+        if existing:
+            taken_qs = taken_qs.exclude(id=existing.id)
+
+        taken = taken_qs.select_related('member', 'member__user').first()
+        if taken:
+            taken_by_name = (
+                taken.member.full_name or
+                taken.member.user.get_full_name() or
+                taken.member.user.username
+            )
+            status_label = "approved" if taken.status == 'APPROVED' else "pending application"
+            return Response(
+                {
+                    "error": f"Jersey number #{jersey_number} is already taken in {batch_team.name} ({taken_by_name}, {status_label}). Please choose another number.",
+                    "code": "JERSEY_TAKEN",
+                    "jersey_number": jersey_number,
+                    "taken_by": taken_by_name,
+                    "batch_name": batch_team.name,
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         position = request.data.get('preferred_position') or profile.primary_position or 'Midfielder'
-        jersey_number = request.data.get('jersey_number') or profile.preferred_jersey_number or 10
         notes = request.data.get('football_notes', '')
 
-        registration = PlayerRegistration.objects.create(
-            member=profile,
-            season=active_season,
-            batch_team=batch_team,
-            preferred_position=position,
-            jersey_number=jersey_number,
-            football_notes=notes,
-            status='PENDING'
-        )
+        if existing:
+            # Reapplying after a previous REJECTED registration
+            existing.batch_team = batch_team
+            existing.preferred_position = position
+            existing.jersey_number = jersey_number
+            existing.football_notes = notes
+            existing.status = 'PENDING'
+            existing.rejection_reason = ''
+            existing.reviewed_by = None
+            existing.reviewed_at = None
+            existing.save()
+            registration = existing
+        else:
+            registration = PlayerRegistration.objects.create(
+                member=profile,
+                season=active_season,
+                batch_team=batch_team,
+                preferred_position=position,
+                jersey_number=jersey_number,
+                football_notes=notes,
+                status='PENDING'
+            )
+
+        # Sync profile's preferred_jersey_number and primary_position
+        profile.preferred_jersey_number = jersey_number
+        if position:
+            profile.primary_position = position
+        profile.save(update_fields=['preferred_jersey_number', 'primary_position'])
 
         serializer = PlayerRegistrationSerializer(registration)
         return Response({
             'message': f"Application submitted! Pending manager approval for {batch_team.name}.",
             'registration': serializer.data
         }, status=status.HTTP_201_CREATED)
+
+
+class BatchJerseyNumbersAPIView(APIView):
+    """
+    Returns taken jersey numbers for a specific batch in the active season,
+    allowing registration forms to validate and display status in real-time.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        batch_code = request.query_params.get('batch_code')
+        if not batch_code and request.user.is_authenticated:
+            profile = getattr(request.user, 'profile', None)
+            if profile and profile.competing_batch:
+                batch_code = profile.competing_batch
+
+        if not batch_code:
+            return Response(
+                {"error": "batch_code query parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        active_season = Season.objects.filter(is_active=True).first() or Season.objects.first()
+        batch_team = BatchTeam.objects.filter(batch_code=batch_code).first()
+        if not batch_team:
+            return Response(
+                {"error": f"Batch team '{batch_code}' not found."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        registrations = PlayerRegistration.objects.filter(
+            batch_team=batch_team,
+            status__in=['APPROVED', 'PENDING']
+        )
+        if active_season:
+            registrations = registrations.filter(season=active_season)
+
+        registrations = registrations.select_related('member', 'member__user').order_by('jersey_number')
+
+        current_user_profile_id = None
+        if request.user.is_authenticated and hasattr(request.user, 'profile') and request.user.profile:
+            current_user_profile_id = request.user.profile.id
+
+        taken_list = []
+        taken_numbers = set()
+        for r in registrations:
+            is_own = (current_user_profile_id is not None and r.member_id == current_user_profile_id)
+            if not is_own:
+                taken_numbers.add(r.jersey_number)
+
+            taken_list.append({
+                'id': r.id,
+                'jersey_number': r.jersey_number,
+                'status': r.status,
+                'member_id': r.member.id,
+                'member_name': r.member.full_name or r.member.user.get_full_name() or r.member.user.username,
+                'position': r.preferred_position,
+                'is_current_user': is_own,
+            })
+
+        return Response({
+            'batch_code': batch_team.batch_code,
+            'batch_name': batch_team.name,
+            'season_id': active_season.id if active_season else None,
+            'season_name': active_season.name if active_season else None,
+            'taken_numbers': sorted(list(taken_numbers)),
+            'taken_details': taken_list,
+        })

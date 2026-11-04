@@ -309,6 +309,30 @@ class ManagerPlayerReviewAPIView(APIView):
         if new_status not in ('APPROVED', 'REJECTED'):
             return Response({"error": "Status must be APPROVED or REJECTED."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Allow manager to adjust or reassign jersey number if needed
+        new_jersey = request.data.get('jersey_number')
+        if new_jersey is not None:
+            try:
+                j_val = int(new_jersey)
+                if 1 <= j_val <= 99:
+                    reg.jersey_number = j_val
+            except (ValueError, TypeError):
+                pass
+
+        # Strict check: Cannot approve duplicate jersey numbers in the same batch squad
+        if new_status == 'APPROVED':
+            conflict = PlayerRegistration.objects.filter(
+                batch_team=reg.batch_team,
+                season=reg.season,
+                jersey_number=reg.jersey_number,
+                status='APPROVED'
+            ).exclude(id=reg.id).select_related('member', 'member__user').first()
+            if conflict:
+                conflict_name = conflict.member.full_name or conflict.member.user.get_full_name() or conflict.member.user.username
+                return Response({
+                    "error": f"Cannot approve application: Jersey #{reg.jersey_number} is already assigned to {conflict_name} in {reg.batch_team.name}. Please reassign the jersey number before approving."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
         reg.status = new_status
         reg.reviewed_by = request.user
         reg.rejection_reason = reason
