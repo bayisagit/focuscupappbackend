@@ -1,5 +1,5 @@
 from django.contrib import admin
-from apps.matches.models import Match, MatchSquad, MatchEvent, AuditLog
+from apps.matches.models import Match, MatchSquad, MatchEvent, AuditLog, MatchGraphic
 
 
 class MatchSquadInline(admin.TabularInline):
@@ -37,3 +37,11 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(MatchGraphic)
+class MatchGraphicAdmin(admin.ModelAdmin):
+    list_display = ('title', 'graphic_type', 'team', 'opponent_team', 'round_number', 'created_at', 'published_by')
+    list_filter = ('graphic_type', 'round_number', 'team', 'created_at')
+    search_fields = ('title', 'team__name', 'opponent_team__name', 'match__home_team__name', 'match__away_team__name')
+    readonly_fields = ('created_at',)

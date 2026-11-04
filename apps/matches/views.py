@@ -1,10 +1,15 @@
-from rest_framework import permissions, generics
+from rest_framework import permissions, generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
-from apps.matches.models import Match
-from apps.matches.serializers import MatchListSerializer, MatchDetailSerializer
+from apps.matches.models import Match, MatchGraphic
+from apps.competitions.models import BatchTeam
+from apps.matches.serializers import (
+    MatchListSerializer,
+    MatchDetailSerializer,
+    MatchGraphicSerializer,
+)
 from apps.statistics.services import get_active_season
 
 
@@ -179,3 +184,80 @@ class LatestAndNextMatchAPIView(APIView):
                 'latest_result': None,
                 'next_upcoming': None,
             })
+
+
+class MatchGraphicListCreateAPIView(APIView):
+    """
+    List and create archived match graphics (Starting Lineup Posters & Broadcast Graphics).
+    Allows managers to review historical lineups and broadcast graphics per round/batch.
+    """
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
+    def get(self, request):
+        qs = MatchGraphic.objects.select_related('match', 'team', 'opponent_team', 'published_by').all()
+
+        match_id = request.query_params.get('match_id')
+        if match_id:
+            qs = qs.filter(match_id=match_id)
+
+        batch_code = request.query_params.get('batch_code')
+        if batch_code:
+            qs = qs.filter(Q(team__batch_code=batch_code) | Q(opponent_team__batch_code=batch_code))
+
+        round_num = request.query_params.get('round')
+        if round_num:
+            try:
+                qs = qs.filter(round_number=int(round_num))
+            except (ValueError, TypeError):
+                pass
+
+        graphic_type = request.query_params.get('graphic_type')
+        if graphic_type:
+            qs = qs.filter(graphic_type=graphic_type)
+
+        serializer = MatchGraphicSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    def post(self, request):
+        if not (request.user.is_staff or getattr(request.user, 'is_manager', False)):
+            return Response({"error": "Manager privileges required."}, status=status.HTTP_403_FORBIDDEN)
+
+        match_id = request.data.get('match_id')
+        match_obj = get_object_or_404(Match, id=match_id)
+
+        team_id = request.data.get('team_id')
+        team_obj = BatchTeam.objects.filter(id=team_id).first() if team_id else None
+
+        opp_id = request.data.get('opponent_team_id')
+        opp_obj = BatchTeam.objects.filter(id=opp_id).first() if opp_id else None
+
+        graphic = MatchGraphic.objects.create(
+            match=match_obj,
+            graphic_type=request.data.get('graphic_type', 'LINEUP_POSTER'),
+            team=team_obj,
+            opponent_team=opp_obj,
+            round_number=int(request.data.get('round_number') or match_obj.round_number or 1),
+            title=request.data.get('title') or f"Matchday Graphic - {match_obj}",
+            image_url=request.data.get('image_url', ''),
+            data_snapshot=request.data.get('data_snapshot', {}),
+            published_by=request.user
+        )
+
+        serializer = MatchGraphicSerializer(graphic)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class MatchGraphicDetailAPIView(APIView):
+    """Retrieve or delete a published match graphic archive."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def delete(self, request, pk):
+        if not (request.user.is_staff or getattr(request.user, 'is_manager', False)):
+            return Response({"error": "Manager privileges required."}, status=status.HTTP_403_FORBIDDEN)
+
+        graphic = get_object_or_404(MatchGraphic, pk=pk)
+        graphic.delete()
+        return Response({"message": "Graphic deleted successfully from archive."}, status=status.HTTP_204_NO_CONTENT)

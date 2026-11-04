@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.matches.models import Match, MatchSquad, MatchEvent
+from apps.matches.models import Match, MatchSquad, MatchEvent, MatchGraphic
 from apps.competitions.serializers import BatchTeamSerializer
 
 
@@ -116,3 +116,47 @@ class MatchDetailSerializer(serializers.ModelSerializer):
             'profile_picture_url': potm.profile_picture_url,
             'personal_chant': potm.personal_chant,
         }
+
+
+class MatchGraphicSerializer(serializers.ModelSerializer):
+    graphic_type_display = serializers.CharField(source='get_graphic_type_display', read_only=True)
+    team_name = serializers.CharField(source='team.name', read_only=True)
+    team_batch_code = serializers.CharField(source='team.batch_code', read_only=True)
+    opponent_name = serializers.CharField(source='opponent_team.name', read_only=True)
+    opponent_batch_code = serializers.CharField(source='opponent_team.batch_code', read_only=True)
+    published_by_name = serializers.SerializerMethodField()
+    match_summary = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MatchGraphic
+        fields = [
+            'id', 'match', 'graphic_type', 'graphic_type_display',
+            'team', 'team_name', 'team_batch_code',
+            'opponent_team', 'opponent_name', 'opponent_batch_code',
+            'round_number', 'title', 'image_url', 'data_snapshot',
+            'published_by', 'published_by_name', 'match_summary',
+            'created_at'
+        ]
+        read_only_fields = ['id', 'created_at', 'published_by']
+
+    def get_published_by_name(self, obj):
+        if not obj.published_by:
+            return 'Tournament Manager'
+        return obj.published_by.get_full_name() or obj.published_by.username
+
+    def get_match_summary(self, obj):
+        try:
+            m = obj.match
+            return {
+                'match_id': m.id,
+                'round_number': m.round_number,
+                'match_date': str(m.match_date),
+                'kick_off_time': str(m.kick_off_time)[:5],
+                'home_team_name': m.home_team.name,
+                'away_team_name': m.away_team.name,
+                'status': m.status,
+                'home_score': m.home_score,
+                'away_score': m.away_score,
+            }
+        except Exception:
+            return None

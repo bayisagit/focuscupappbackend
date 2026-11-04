@@ -207,3 +207,60 @@ class AuditLog(models.Model):
     def __str__(self):
         user_display = self.user.username if self.user else "System"
         return f"{self.timestamp.strftime('%Y-%m-%d %H:%M')} | {user_display} | {self.get_action_type_display()} on {self.model_name} #{self.object_id}"
+
+
+class MatchGraphic(models.Model):
+    GRAPHIC_TYPES = [
+        ('LINEUP_POSTER', 'Starting Lineup Poster'),
+        ('BROADCAST_LIVE', 'Live Match Event Graphic'),
+        ('BROADCAST_FINAL', 'Final Whistle Result Graphic'),
+    ]
+
+    match = models.ForeignKey(Match, on_delete=models.CASCADE, related_name='graphics')
+    graphic_type = models.CharField(max_length=30, choices=GRAPHIC_TYPES, default='LINEUP_POSTER')
+
+    # Team that this graphic represents (e.g. 5th Year Batch for a lineup poster)
+    team = models.ForeignKey(
+        BatchTeam,
+        on_delete=models.CASCADE,
+        related_name='published_graphics',
+        null=True,
+        blank=True
+    )
+    # Opponent team (e.g. 4th Year Batch)
+    opponent_team = models.ForeignKey(
+        BatchTeam,
+        on_delete=models.CASCADE,
+        related_name='opponent_graphics',
+        null=True,
+        blank=True
+    )
+
+    round_number = models.PositiveSmallIntegerField(default=1)
+    title = models.CharField(max_length=255)
+    image_url = models.CharField(
+        max_length=500,
+        help_text="Direct link or Cloudinary CDN URL to the published high-resolution PNG"
+    )
+
+    # Detailed snapshot of the squad, starters, subs, formations, scoreline, scorers, etc.
+    data_snapshot = models.JSONField(default=dict, blank=True)
+
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='published_graphics'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Match Graphic Archive'
+        verbose_name_plural = 'Match Graphic Archives'
+
+    def __str__(self):
+        team_str = self.team.name if self.team else "Match"
+        return f"[{self.get_graphic_type_display()}] {team_str} (Round {self.round_number}) - {self.created_at.strftime('%Y-%m-%d')}"
+
