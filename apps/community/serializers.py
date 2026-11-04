@@ -20,15 +20,25 @@ class AnnouncementSerializer(serializers.ModelSerializer):
 
 
 class GalleryPhotoSerializer(serializers.ModelSerializer):
-    uploaded_by_name = serializers.CharField(source='uploaded_by.get_full_name', read_only=True)
+    uploaded_by_name = serializers.SerializerMethodField()
     image = serializers.SerializerMethodField()
 
     class Meta:
         model = GalleryPhoto
         fields = ['id', 'album', 'image', 'image_url', 'caption', 'uploaded_by_name', 'created_at']
 
+    def get_uploaded_by_name(self, obj):
+        if not obj.uploaded_by:
+            return 'Fellowship Member'
+        full = obj.uploaded_by.get_full_name().strip()
+        if full:
+            return full
+        if obj.uploaded_by.username:
+            return obj.uploaded_by.username.title()
+        return 'Fellowship Member'
+
     def get_image(self, obj):
-        return obj.photo_url
+        return obj.photo_url or obj.image_url or (obj.image.url if obj.image else '')
 
 
 class GalleryAlbumSerializer(serializers.ModelSerializer):

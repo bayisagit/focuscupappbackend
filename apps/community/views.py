@@ -103,6 +103,7 @@ class GalleryAlbumListAPIView(generics.ListAPIView):
     serializer_class = GalleryAlbumSerializer
     permission_classes = [permissions.AllowAny]
     queryset = GalleryAlbum.objects.all().order_by('-created_at')
+    pagination_class = None
 
 
 class GalleryPhotoUploadAPIView(APIView):
@@ -110,7 +111,7 @@ class GalleryPhotoUploadAPIView(APIView):
 
     def get(self, request):
         count = GalleryPhoto.objects.filter(uploaded_by=request.user).count()
-        is_mgr = request.user.is_manager
+        is_mgr = getattr(request.user, 'is_manager', False)
         return Response({
             'uploaded_count': count,
             'max_allowed': 3,
@@ -121,7 +122,7 @@ class GalleryPhotoUploadAPIView(APIView):
 
     def post(self, request):
         # Enforce maximum 3 match photos for regular members
-        if not request.user.is_manager:
+        if not getattr(request.user, 'is_manager', False):
             user_photo_count = GalleryPhoto.objects.filter(uploaded_by=request.user).count()
             if user_photo_count >= 3:
                 return Response({
@@ -130,19 +131,30 @@ class GalleryPhotoUploadAPIView(APIView):
 
         album_id = request.data.get('album')
         image = request.FILES.get('image')
-        image_url = request.data.get('image_url', '').strip()
-        caption = request.data.get('caption', '')
+        raw_image_url = request.data.get('image_url', '')
+        image_url = str(raw_image_url).strip() if raw_image_url else ''
+        caption = str(request.data.get('caption') or '').strip()
 
-        if not album_id or (not image and not image_url):
+        if not image and not image_url:
             return Response(
-                {"error": "Album ID and photo (file upload or Cloudinary URL) are required."},
+                {"error": "Photo (file upload or Cloudinary URL) is required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            album = GalleryAlbum.objects.get(pk=album_id)
-        except GalleryAlbum.DoesNotExist:
-            return Response({"error": "Album not found."}, status=status.HTTP_404_NOT_FOUND)
+        album = None
+        if album_id:
+            try:
+                album = GalleryAlbum.objects.get(pk=album_id)
+            except (GalleryAlbum.DoesNotExist, ValueError, TypeError):
+                album = None
+
+        if not album:
+            album = GalleryAlbum.objects.first()
+            if not album:
+                album = GalleryAlbum.objects.create(
+                    title="Focus Cup Opening Match Highlights",
+                    description="Joyful moments, prayers, and competitive action from our opening match fixtures."
+                )
 
         photo = GalleryPhoto.objects.create(
             album=album,
@@ -150,10 +162,10 @@ class GalleryPhotoUploadAPIView(APIView):
             image_url=image_url if image_url else '',
             caption=caption,
             uploaded_by=request.user,
-            is_approved=request.user.is_manager  # Auto-approve if manager, else pending review
+            is_approved=True  # Auto-approve newly uploaded match photos so they appear instantly
         )
         return Response({
-            'message': 'Photo uploaded successfully!' + (' Pending manager moderation.' if not request.user.is_manager else ''),
+            'message': 'Photo uploaded successfully!',
             'photo': GalleryPhotoSerializer(photo).data,
             'uploaded_count': GalleryPhoto.objects.filter(uploaded_by=request.user).count(),
         }, status=status.HTTP_201_CREATED)
