@@ -130,11 +130,44 @@ class BatchTeamDetailAPIView(APIView):
 
         # All fellowship members in this batch
         if team.batch_code == 'OTHER':
-            members_qs = MemberProfile.objects.filter(academic_year='Other', is_approved=True)
+            members_qs = MemberProfile.objects.filter(
+                Q(academic_year='Other') | Q(competing_batch='OTHER'),
+                is_approved=True
+            )
         else:
             members_qs = MemberProfile.objects.filter(competing_batch=team.batch_code, is_approved=True)
 
         total_members = members_qs.count()
+
+        # Map approved roster players for cross-referencing
+        roster_by_member_id = {reg.member_id: reg for reg in roster_entries}
+        registered_members = []
+        for m in members_qs.select_related('user').order_by('first_name', 'second_name'):
+            reg = roster_by_member_id.get(m.id)
+            registered_members.append({
+                'id': m.id,
+                'username': m.user.username if m.user else '',
+                'full_name': m.full_name,
+                'first_name': m.first_name,
+                'second_name': m.second_name,
+                'department': m.department,
+                'college': m.college,
+                'academic_year': m.academic_year,
+                'fellowship_team': m.fellowship_team,
+                'gender': m.gender,
+                'primary_position': m.primary_position,
+                'secondary_position': m.secondary_position,
+                'preferred_jersey_number': m.preferred_jersey_number,
+                'profile_picture': m.avatar_url,
+                'avatar_url': m.avatar_url,
+                'profile_picture_url': m.profile_picture_url,
+                'personal_chant': m.personal_chant,
+                'is_coach': m.is_coach,
+                'coached_batch_name': m.coached_batch_name,
+                'is_on_roster': bool(reg),
+                'roster_jersey_number': reg.jersey_number if reg else None,
+                'roster_position': reg.preferred_position if reg else None,
+            })
 
         # Fixtures and Results
         fixtures = []
@@ -172,6 +205,7 @@ class BatchTeamDetailAPIView(APIView):
         return Response({
             'team': BatchTeamSerializer(team).data,
             'total_members': total_members,
+            'registered_members': registered_members,
             'roster': roster,
             'standing': team_standing,
             'fixtures': fixtures,
