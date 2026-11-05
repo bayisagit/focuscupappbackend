@@ -309,7 +309,8 @@ class BatchCoachWorkflowTestCase(TestCase):
         self.client.force_authenticate(user=self.manager)
         list_res = self.client.get('/api/v1/manager/coaches/')
         self.assertEqual(list_res.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(list_res.data), 2)
+        batches_list = list_res.data.get('batches') if isinstance(list_res.data, dict) else list_res.data
+        self.assertEqual(len(batches_list), 2)
 
         # 2. Manager appoints Mecha as 2nd Year Coach with dedicated username & password
         assign_res = self.client.post('/api/v1/manager/coaches/assign/', {

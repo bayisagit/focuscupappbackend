@@ -1189,40 +1189,49 @@ class ManagerBatchCoachesAPIView(APIView):
                     'member_id': cm.id,
                     'full_name': cm.full_name,
                     'avatar_url': cm.avatar_url,
+                    'photo_url': cm.avatar_url,
                     'department': cm.department,
                     'academic_year': cm.academic_year,
                     'college': cm.get_college_display(),
+                    'jersey_number': cm.preferred_jersey_number,
                     'preferred_jersey_number': cm.preferred_jersey_number,
                     'is_active': cu.is_active,
                     'appointed_at': cu.created_at,
                 }
 
+            cand_list = [
+                {
+                    'id': c.id,
+                    'full_name': c.full_name,
+                    'first_name': c.first_name,
+                    'second_name': c.second_name,
+                    'username': c.user.username,
+                    'department': c.department,
+                    'academic_year': c.academic_year,
+                    'avatar_url': c.avatar_url,
+                    'photo_url': c.avatar_url,
+                    'jersey_number': c.preferred_jersey_number,
+                    'preferred_jersey_number': c.preferred_jersey_number,
+                }
+                for c in candidates
+            ]
+
             data.append({
                 'id': team.id,
+                'batch_id': team.id,
                 'batch_code': team.batch_code,
                 'name': team.name,
                 'nickname': team.nickname,
                 'color_hex': team.color_hex,
+                'primary_color': team.color_hex,
                 'photo_url': team.photo_url,
                 'has_coach': bool(coach_data),
                 'coach': coach_data,
-                'eligible_candidates': [
-                    {
-                        'id': c.id,
-                        'full_name': c.full_name,
-                        'first_name': c.first_name,
-                        'second_name': c.second_name,
-                        'username': c.user.username,
-                        'department': c.department,
-                        'academic_year': c.academic_year,
-                        'avatar_url': c.avatar_url,
-                        'preferred_jersey_number': c.preferred_jersey_number,
-                    }
-                    for c in candidates
-                ]
+                'eligible_members': cand_list,
+                'eligible_candidates': cand_list,
             })
 
-        return Response(data)
+        return Response({"batches": data, "results": data, "count": len(data)})
 
 
 class ManagerAssignCoachAPIView(APIView):
