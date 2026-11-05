@@ -269,7 +269,11 @@ def get_most_followed_members(limit=10, batch_code=None):
     if batch_code:
         qs = qs.filter(competing_batch=batch_code)
 
-    profiles = qs.select_related('user').order_by('-followers_count', 'first_name')[:limit]
+    qs = qs.select_related('user').order_by('-followers_count', 'first_name')
+    if limit and limit > 0:
+        profiles = qs[:limit]
+    else:
+        profiles = qs.all()
 
     results = []
     for rank, p in enumerate(profiles, start=1):

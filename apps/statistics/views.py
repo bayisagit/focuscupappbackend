@@ -36,7 +36,22 @@ class MostFollowedMembersAPIView(APIView):
 
     def get(self, request):
         batch = request.query_params.get('batch')
-        limit = int(request.query_params.get('limit', 10))
+        raw_limit = request.query_params.get('limit')
+        is_all = (
+            request.query_params.get('all') in ('true', '1') or
+            request.query_params.get('view_all') in ('true', '1') or
+            raw_limit in ('all', '0', '-1')
+        )
+        if is_all:
+            limit = 500
+        else:
+            try:
+                limit = int(raw_limit) if raw_limit else 20
+                if limit <= 0:
+                    limit = 500
+            except (ValueError, TypeError):
+                limit = 20
+
         members = get_most_followed_members(limit=limit, batch_code=batch)
         return Response(members)
 
