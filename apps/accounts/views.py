@@ -27,11 +27,36 @@ def get_user_coach_info(user):
     elif hasattr(user, 'coached_teams'):
         coached_team = user.coached_teams.first()
 
+    coach_member = coached_team.coach_member if coached_team else getattr(user, 'linked_member', None)
+    if not coach_member and hasattr(user, 'profile'):
+        coach_member = user.profile
+
+    avatar = None
+    if coach_member:
+        avatar = getattr(coach_member, 'avatar_url', None) or getattr(coach_member, 'profile_picture_url', None)
+        if not avatar and getattr(coach_member, 'profile_picture', None):
+            try:
+                avatar = coach_member.profile_picture.url
+            except Exception:
+                avatar = str(coach_member.profile_picture)
+    coach_full_name = coach_member.full_name if coach_member else None
+
     return {
         'is_coach': True,
         'coached_batch': coached_team.batch_code if coached_team else None,
         'coached_batch_name': coached_team.name if coached_team else None,
         'coached_batch_id': coached_team.id if coached_team else None,
+        'coach_name': coach_full_name,
+        'coach_avatar_url': avatar,
+        'coach_photo_url': avatar,
+        'coach_member': {
+            'id': coach_member.id,
+            'full_name': coach_full_name,
+            'avatar_url': avatar,
+            'photo_url': avatar,
+            'department': coach_member.department,
+            'username': coach_member.user.username if coach_member and coach_member.user else '',
+        } if coach_member else None,
         'coached_team': {
             'id': coached_team.id,
             'batch_code': coached_team.batch_code,
@@ -39,6 +64,8 @@ def get_user_coach_info(user):
             'nickname': coached_team.nickname,
             'color_hex': coached_team.color_hex,
             'photo_url': coached_team.photo_url,
+            'coach_name': coach_full_name,
+            'coach_photo_url': avatar,
         } if coached_team else None,
     }
 
@@ -71,6 +98,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'coached_batch_name': coach_info['coached_batch_name'],
             'coached_batch_id': coach_info['coached_batch_id'],
             'coached_team': coach_info['coached_team'],
+            'coach_name': coach_info.get('coach_name'),
+            'coach_avatar_url': coach_info.get('coach_avatar_url'),
+            'coach_photo_url': coach_info.get('coach_photo_url'),
+            'coach_member': coach_info.get('coach_member'),
         }
 
         # Resolve member profile (either directly on user, or via linked_member for coach account)
@@ -212,6 +243,10 @@ class CurrentUserView(APIView):
             'coached_batch_name': coach_info['coached_batch_name'],
             'coached_batch_id': coach_info['coached_batch_id'],
             'coached_team': coach_info['coached_team'],
+            'coach_name': coach_info.get('coach_name'),
+            'coach_avatar_url': coach_info.get('coach_avatar_url'),
+            'coach_photo_url': coach_info.get('coach_photo_url'),
+            'coach_member': coach_info.get('coach_member'),
             'profile': profile_data,
             'player_registration': player_registration,
         })
