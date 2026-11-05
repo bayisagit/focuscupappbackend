@@ -100,6 +100,7 @@ class BatchTeamDetailAPIView(APIView):
                 'avatar_url': reg.member.avatar_url,
                 'profile_picture_url': reg.member.profile_picture_url,
                 'personal_chant': reg.member.personal_chant,
+                'is_coach': reg.member.is_coach,
             } for reg in roster_entries
         ]
 

@@ -108,6 +108,24 @@ class MemberProfile(models.Model):
                 return str(self.profile_picture)
         return None
 
+    @property
+    def is_coach(self):
+        return self.coached_batch_teams.exists()
+
+    @property
+    def coached_batch_team(self):
+        return self.coached_batch_teams.first()
+
+    @property
+    def coached_batch_name(self):
+        team = self.coached_batch_team
+        return team.name if team else None
+
+    @property
+    def coached_batch_code(self):
+        team = self.coached_batch_team
+        return team.batch_code if team else None
+
     def clean(self):
         super().clean()
         is_valid, err_msg, is_eligible, batch = validate_academic_eligibility(

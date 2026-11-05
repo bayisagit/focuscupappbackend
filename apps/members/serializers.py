@@ -14,6 +14,9 @@ class MemberProfileListSerializer(serializers.ModelSerializer):
     batch_display = serializers.CharField(source='get_competing_batch_display', read_only=True)
     is_following = serializers.SerializerMethodField()
     profile_picture = serializers.SerializerMethodField()
+    is_coach = serializers.BooleanField(read_only=True)
+    coached_batch_name = serializers.CharField(read_only=True)
+    coached_batch_code = serializers.CharField(read_only=True)
 
     class Meta:
         model = MemberProfile
@@ -23,7 +26,8 @@ class MemberProfileListSerializer(serializers.ModelSerializer):
             'batch_display', 'competing_batch', 'fellowship_team', 'gender',
             'primary_position', 'preferred_jersey_number', 'profile_picture',
             'profile_picture_url', 'personal_chant', 'followers_count', 'following_count',
-            'is_football_eligible', 'is_following', 'created_at'
+            'is_football_eligible', 'is_following', 'is_coach', 'coached_batch_name',
+            'coached_batch_code', 'created_at'
         ]
 
     def get_profile_picture(self, obj):
@@ -45,6 +49,9 @@ class MemberProfileDetailSerializer(serializers.ModelSerializer):
     football_stats = serializers.SerializerMethodField()
     player_registration = serializers.SerializerMethodField()
     awards = serializers.SerializerMethodField()
+    is_coach = serializers.BooleanField(read_only=True)
+    coached_batch_name = serializers.CharField(read_only=True)
+    coached_batch_code = serializers.CharField(read_only=True)
 
     class Meta:
         model = MemberProfile
@@ -55,7 +62,8 @@ class MemberProfileDetailSerializer(serializers.ModelSerializer):
             'primary_position', 'secondary_position', 'preferred_jersey_number',
             'profile_picture', 'profile_picture_url', 'jersey_picture', 'bio', 'personal_chant',
             'followers_count', 'following_count', 'is_football_eligible',
-            'is_following', 'football_stats', 'player_registration',
+            'is_following', 'is_coach', 'coached_batch_name', 'coached_batch_code',
+            'football_stats', 'player_registration',
             'awards', 'created_at'
         ]
 

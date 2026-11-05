@@ -9,13 +9,16 @@ class BatchTeamSerializer(serializers.ModelSerializer):
     photo_url = serializers.CharField(read_only=True, allow_null=True)
     logo_url = serializers.CharField(read_only=True, allow_null=True)
     team_photo_url = serializers.CharField(read_only=True, allow_null=True)
+    coach_name = serializers.CharField(source='coach_member.full_name', read_only=True, allow_null=True)
+    coach_photo_url = serializers.CharField(source='coach_member.avatar_url', read_only=True, allow_null=True)
+    coach_member_id = serializers.IntegerField(source='coach_member.id', read_only=True, allow_null=True)
 
     class Meta:
         model = BatchTeam
         fields = [
             'id', 'batch_code', 'name', 'nickname', 'color_hex',
             'logo', 'logo_url', 'team_photo', 'team_photo_url', 'photo_url',
-            'motto', 'description',
+            'motto', 'description', 'coach_name', 'coach_photo_url', 'coach_member_id',
             'is_competing', 'total_members', 'approved_players', 'created_at'
         ]
 
