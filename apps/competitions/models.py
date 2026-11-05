@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 from apps.members.constants import COMPETING_BATCH_CHOICES
 
 class Season(models.Model):
@@ -75,6 +76,22 @@ class BatchTeam(models.Model):
     is_competing = models.BooleanField(
         default=True,
         help_text="False for 'Other' community fellowship group; True for 2nd, 3rd, 4th, 5th year teams"
+    )
+    coach_user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='coached_batch_team',
+        help_text="Dedicated coach user login account for this batch team"
+    )
+    coach_member = models.ForeignKey(
+        'members.MemberProfile',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='coached_batch_teams',
+        help_text="The registered fellowship member appointed as coach for this batch"
     )
     created_at = models.DateTimeField(auto_now_add=True)
 

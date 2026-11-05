@@ -19,6 +19,16 @@ from apps.core.manager_views import (
     ManagerAuditLogListAPIView,
     ManagerExportAPIView,
     ManagerMigrateAPIView,
+    ManagerBatchCoachesAPIView,
+    ManagerAssignCoachAPIView,
+    ManagerRevokeCoachAPIView,
+)
+from apps.core.coach_views import (
+    CoachDashboardAPIView,
+    CoachPlayerRegistrationsAPIView,
+    CoachPlayerReviewAPIView,
+    CoachMatchesAPIView,
+    CoachMatchSquadAPIView,
 )
 
 urlpatterns = [
@@ -42,4 +52,16 @@ urlpatterns = [
     path('manager/matches/<int:match_id>/events/', ManagerMatchEventAPIView.as_view(), name='manager_match_events'),
     path('manager/audit-logs/', ManagerAuditLogListAPIView.as_view(), name='manager_audit_logs'),
     path('manager/export/<str:data_type>/', ManagerExportAPIView.as_view(), name='manager_export'),
+
+    # Manager Coach Management
+    path('manager/coaches/', ManagerBatchCoachesAPIView.as_view(), name='manager_batch_coaches'),
+    path('manager/coaches/assign/', ManagerAssignCoachAPIView.as_view(), name='manager_assign_coach'),
+    path('manager/coaches/revoke/', ManagerRevokeCoachAPIView.as_view(), name='manager_revoke_coach'),
+
+    # Dedicated Batch Coach Endpoints
+    path('coach/dashboard/', CoachDashboardAPIView.as_view(), name='coach_dashboard'),
+    path('coach/players/', CoachPlayerRegistrationsAPIView.as_view(), name='coach_player_registrations'),
+    path('coach/players/<int:registration_id>/review/', CoachPlayerReviewAPIView.as_view(), name='coach_player_review'),
+    path('coach/matches/', CoachMatchesAPIView.as_view(), name='coach_matches'),
+    path('coach/matches/<int:match_id>/squad/', CoachMatchSquadAPIView.as_view(), name='coach_match_squad'),
 ]

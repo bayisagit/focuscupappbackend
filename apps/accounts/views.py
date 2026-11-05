@@ -11,6 +11,38 @@ from apps.members.models import MemberProfile, PlayerRegistration
 User = get_user_model()
 
 
+def get_user_coach_info(user):
+    if not getattr(user, 'is_coach', False):
+        return {
+            'is_coach': False,
+            'coached_batch': None,
+            'coached_batch_name': None,
+            'coached_batch_id': None,
+            'coached_team': None,
+        }
+
+    coached_team = None
+    if hasattr(user, 'coached_batch_team') and user.coached_batch_team:
+        coached_team = user.coached_batch_team
+    elif hasattr(user, 'coached_teams'):
+        coached_team = user.coached_teams.first()
+
+    return {
+        'is_coach': True,
+        'coached_batch': coached_team.batch_code if coached_team else None,
+        'coached_batch_name': coached_team.name if coached_team else None,
+        'coached_batch_id': coached_team.id if coached_team else None,
+        'coached_team': {
+            'id': coached_team.id,
+            'batch_code': coached_team.batch_code,
+            'name': coached_team.name,
+            'nickname': coached_team.nickname,
+            'color_hex': coached_team.color_hex,
+            'photo_url': coached_team.photo_url,
+        } if coached_team else None,
+    }
+
+
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         username_or_email = attrs.get('username', '').strip()
@@ -24,6 +56,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                 attrs['username'] = matched_user.username
 
         data = super().validate(attrs)
+        coach_info = get_user_coach_info(self.user)
+
         data['user'] = {
             'id': self.user.id,
             'username': self.user.username,
@@ -32,9 +66,16 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             'last_name': self.user.last_name,
             'role': self.user.role,
             'is_manager': self.user.is_manager,
+            'is_coach': coach_info['is_coach'],
+            'coached_batch': coach_info['coached_batch'],
+            'coached_batch_name': coach_info['coached_batch_name'],
+            'coached_batch_id': coach_info['coached_batch_id'],
+            'coached_team': coach_info['coached_team'],
         }
-        if hasattr(self.user, 'profile'):
-            prof = self.user.profile
+
+        # Resolve member profile (either directly on user, or via linked_member for coach account)
+        prof = getattr(self.user, 'profile', None) or getattr(self.user, 'linked_member', None)
+        if prof:
             data['user']['profile'] = {
                 'id': prof.id,
                 'first_name': prof.first_name,
@@ -114,7 +155,8 @@ class CurrentUserView(APIView):
 
     def get(self, request):
         user = request.user
-        prof = getattr(user, 'profile', None)
+        prof = getattr(user, 'profile', None) or getattr(user, 'linked_member', None)
+        coach_info = get_user_coach_info(user)
 
         profile_data = None
         player_registration = None
@@ -165,6 +207,11 @@ class CurrentUserView(APIView):
             'email': user.email,
             'role': user.role,
             'is_manager': user.is_manager,
+            'is_coach': coach_info['is_coach'],
+            'coached_batch': coach_info['coached_batch'],
+            'coached_batch_name': coach_info['coached_batch_name'],
+            'coached_batch_id': coach_info['coached_batch_id'],
+            'coached_team': coach_info['coached_team'],
             'profile': profile_data,
             'player_registration': player_registration,
         })

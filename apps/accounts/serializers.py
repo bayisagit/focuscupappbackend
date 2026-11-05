@@ -73,6 +73,8 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 
 class UserSummarySerializer(serializers.ModelSerializer):
+    is_coach = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'role', 'is_manager', 'created_at']
+        fields = ['id', 'username', 'email', 'role', 'is_manager', 'is_coach', 'created_at']

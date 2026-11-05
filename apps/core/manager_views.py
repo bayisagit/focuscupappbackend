@@ -689,6 +689,9 @@ class ManagerMatchSquadAPIView(APIView):
                     'batch_code': match.home_team.batch_code,
                     'nickname': match.home_team.nickname,
                     'color_hex': match.home_team.color_hex,
+                    'coach_name': match.home_team.coach_member.full_name if match.home_team.coach_member else None,
+                    'coach_username': match.home_team.coach_user.username if match.home_team.coach_user else None,
+                    'has_coach': bool(match.home_team.coach_member and match.home_team.coach_user),
                 },
                 'away_team': {
                     'id': match.away_team.id,
@@ -696,8 +699,13 @@ class ManagerMatchSquadAPIView(APIView):
                     'batch_code': match.away_team.batch_code,
                     'nickname': match.away_team.nickname,
                     'color_hex': match.away_team.color_hex,
+                    'coach_name': match.away_team.coach_member.full_name if match.away_team.coach_member else None,
+                    'coach_username': match.away_team.coach_user.username if match.away_team.coach_user else None,
+                    'has_coach': bool(match.away_team.coach_member and match.away_team.coach_user),
                 },
             },
+            'home_lineup_submitted': home_squad_entries.exists(),
+            'away_lineup_submitted': away_squad_entries.exists(),
             'home_eligible_players': home_eligible,
             'away_eligible_players': away_eligible,
             'home_squad': serialize_squad(home_squad_entries),
@@ -1149,3 +1157,201 @@ class ManagerMigrateAPIView(APIView):
             return Response({"status": "success", "output": out.getvalue()})
         except Exception as e:
             return Response({"status": "error", "error": str(e), "output": out.getvalue()}, status=500)
+
+
+class ManagerBatchCoachesAPIView(APIView):
+    """
+    List all competing batches with current appointed coach details and eligible member candidates.
+    """
+    permission_classes = [IsTournamentManager]
+
+    def get(self, request):
+        teams = BatchTeam.objects.filter(is_competing=True).select_related(
+            'coach_user', 'coach_member', 'coach_member__user'
+        ).order_by('batch_code')
+
+        data = []
+        for team in teams:
+            candidates = MemberProfile.objects.filter(
+                competing_batch=team.batch_code,
+                is_suspended=False,
+                is_approved=True
+            ).select_related('user').order_by('first_name', 'second_name')
+
+            coach_data = None
+            if team.coach_member and team.coach_user:
+                cm = team.coach_member
+                cu = team.coach_user
+                coach_data = {
+                    'user_id': cu.id,
+                    'username': cu.username,
+                    'email': cu.email,
+                    'member_id': cm.id,
+                    'full_name': cm.full_name,
+                    'avatar_url': cm.avatar_url,
+                    'department': cm.department,
+                    'academic_year': cm.academic_year,
+                    'college': cm.get_college_display(),
+                    'preferred_jersey_number': cm.preferred_jersey_number,
+                    'is_active': cu.is_active,
+                    'appointed_at': cu.created_at,
+                }
+
+            data.append({
+                'id': team.id,
+                'batch_code': team.batch_code,
+                'name': team.name,
+                'nickname': team.nickname,
+                'color_hex': team.color_hex,
+                'photo_url': team.photo_url,
+                'has_coach': bool(coach_data),
+                'coach': coach_data,
+                'eligible_candidates': [
+                    {
+                        'id': c.id,
+                        'full_name': c.full_name,
+                        'first_name': c.first_name,
+                        'second_name': c.second_name,
+                        'username': c.user.username,
+                        'department': c.department,
+                        'academic_year': c.academic_year,
+                        'avatar_url': c.avatar_url,
+                        'preferred_jersey_number': c.preferred_jersey_number,
+                    }
+                    for c in candidates
+                ]
+            })
+
+        return Response(data)
+
+
+class ManagerAssignCoachAPIView(APIView):
+    """
+    Appoint or update a coach for a specific batch.
+    Manager specifies the batch, the registered member, the coach login username, and password.
+    """
+    permission_classes = [IsTournamentManager]
+
+    def post(self, request):
+        batch_code = request.data.get('batch_code')
+        member_id = request.data.get('member_id')
+        username = (request.data.get('username') or '').strip()
+        password = (request.data.get('password') or '').strip()
+
+        if not batch_code or not member_id or not username or not password:
+            return Response(
+                {"error": "Please provide batch_code, member_id, username, and password."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(password) < 6:
+            return Response({"error": "Password must be at least 6 characters long."}, status=status.HTTP_400_BAD_REQUEST)
+
+        team = get_object_or_404(BatchTeam, batch_code=batch_code)
+        member = get_object_or_404(MemberProfile.objects.select_related('user'), id=member_id)
+
+        # Validate that member belongs to this batch
+        if member.competing_batch != team.batch_code:
+            return Response({
+                "error": f"Member {member.full_name} belongs to batch {member.get_competing_batch_display()}, not {team.name}."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Check username uniqueness: cannot conflict with another user (unless it's the current coach user of this team)
+        existing_user = CustomUser.objects.filter(username__iexact=username).first()
+        if existing_user:
+            if team.coach_user and team.coach_user.id == existing_user.id:
+                coach_user = existing_user
+            else:
+                return Response(
+                    {"error": f"The username '{username}' is already in use. Please choose another username for this coach."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        else:
+            coach_user = None
+
+        with transaction.atomic():
+            if coach_user:
+                coach_user.username = username
+                coach_user.set_password(password)
+                coach_user.role = 'COACH'
+                coach_user.linked_member = member
+                coach_user.is_active = True
+                coach_user.save()
+            else:
+                # If team already had an old coach user with a different username, deactivate the old one
+                if team.coach_user and team.coach_user != existing_user:
+                    team.coach_user.is_active = False
+                    team.coach_user.save(update_fields=['is_active'])
+
+                coach_email = f"{username.lower()}@focuscup.local"
+                coach_user = CustomUser.objects.create_user(
+                    username=username,
+                    email=coach_email,
+                    password=password,
+                    role='COACH',
+                    linked_member=member,
+                    first_name=member.first_name,
+                    last_name=member.second_name,
+                )
+
+            team.coach_user = coach_user
+            team.coach_member = member
+            team.save(update_fields=['coach_user', 'coach_member'])
+
+            AuditLog.objects.create(
+                user=request.user,
+                action_type='UPDATE',
+                model_name='BatchTeam',
+                object_id=str(team.id),
+                object_repr=team.name,
+                notes=f"Coach appointed: {member.full_name} (Login username: {username}) for {team.name} by Manager {request.user.username}."
+            )
+
+        return Response({
+            "message": f"Coach {member.full_name} has been successfully appointed for {team.name}!",
+            "coach": {
+                'username': coach_user.username,
+                'member_id': member.id,
+                'full_name': member.full_name,
+                'batch_name': team.name,
+                'batch_code': team.batch_code,
+            }
+        }, status=status.HTTP_200_OK)
+
+
+class ManagerRevokeCoachAPIView(APIView):
+    """
+    Revoke a coach appointment from a batch team.
+    """
+    permission_classes = [IsTournamentManager]
+
+    def post(self, request):
+        batch_code = request.data.get('batch_code')
+        if not batch_code:
+            return Response({"error": "batch_code is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        team = get_object_or_404(BatchTeam, batch_code=batch_code)
+
+        former_name = team.coach_member.full_name if team.coach_member else "Coach"
+        with transaction.atomic():
+            if team.coach_user:
+                team.coach_user.is_active = False
+                team.coach_user.save(update_fields=['is_active'])
+
+            team.coach_user = None
+            team.coach_member = None
+            team.save(update_fields=['coach_user', 'coach_member'])
+
+            AuditLog.objects.create(
+                user=request.user,
+                action_type='UPDATE',
+                model_name='BatchTeam',
+                object_id=str(team.id),
+                object_repr=team.name,
+                notes=f"Coach role revoked from {former_name} for {team.name} by Manager {request.user.username}."
+            )
+
+        return Response({
+            "message": f"Coach appointment for {team.name} has been revoked.",
+            "batch_code": team.batch_code,
+        })
