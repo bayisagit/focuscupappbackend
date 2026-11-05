@@ -278,7 +278,7 @@ class MemberFollowingListAPIView(generics.ListAPIView):
 
 
 class UpdateMyProfileAPIView(APIView):
-    """Allows authenticated user to update their personal and football details."""
+    """Allows authenticated user to update their personal, academic and football details."""
     permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request):
@@ -286,15 +286,43 @@ class UpdateMyProfileAPIView(APIView):
         if not profile:
             return Response({"error": "Profile not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        old_competing_batch = profile.competing_batch
         serializer = MemberProfileUpdateSerializer(profile, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            # Also update User first/last name if supplied
+
+            # Also update User first/last name or email if supplied
+            user_modified = False
             if 'first_name' in serializer.validated_data:
                 request.user.first_name = serializer.validated_data['first_name']
+                user_modified = True
             if 'second_name' in serializer.validated_data:
                 request.user.last_name = serializer.validated_data['second_name']
-            request.user.save()
+                user_modified = True
+            if 'email' in request.data:
+                new_email = str(request.data['email']).strip().lower()
+                if new_email and new_email != (request.user.email or '').lower():
+                    if User.objects.filter(email__iexact=new_email).exclude(id=request.user.id).exists():
+                        return Response({"email": ["This email address is already in use by another account."]}, status=status.HTTP_400_BAD_REQUEST)
+                    request.user.email = new_email
+                    user_modified = True
+
+            if user_modified:
+                request.user.save()
+
+            # If member's competing batch changed, synchronize existing player registrations
+            if old_competing_batch != profile.competing_batch and profile.competing_batch:
+                new_team = BatchTeam.objects.filter(batch_code=profile.competing_batch).first()
+                if new_team:
+                    for reg in PlayerRegistration.objects.filter(member=profile):
+                        if reg.batch_team != new_team:
+                            reg.batch_team = new_team
+                            if reg.status == 'APPROVED':
+                                reg.status = 'PENDING'
+                                reg.reviewed_by = None
+                                reg.reviewed_at = None
+                            reg.save()
+
             return Response(MemberProfileDetailSerializer(profile, context={'request': request}).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 

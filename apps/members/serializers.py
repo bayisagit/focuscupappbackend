@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from django.db.models import Q
 from apps.members.models import MemberProfile, MemberFollow, PlayerRegistration
+from apps.members.constants import validate_academic_eligibility
 from apps.matches.models import MatchSquad, MatchEvent
 from apps.statistics.models import TournamentAward
 
@@ -411,10 +412,23 @@ class MemberProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = MemberProfile
         fields = [
-            'first_name', 'second_name', 'fellowship_team', 'primary_position',
+            'first_name', 'second_name', 'college', 'department', 'academic_year',
+            'fellowship_team', 'gender', 'primary_position',
             'secondary_position', 'preferred_jersey_number',
             'profile_picture', 'profile_picture_url', 'jersey_picture', 'bio', 'personal_chant'
         ]
+
+    def validate(self, attrs):
+        college = attrs.get('college', getattr(self.instance, 'college', None))
+        department = attrs.get('department', getattr(self.instance, 'department', None))
+        academic_year = attrs.get('academic_year', getattr(self.instance, 'academic_year', None))
+
+        if college or department or academic_year:
+            is_valid, err_msg, _, _ = validate_academic_eligibility(college, department, academic_year)
+            if not is_valid:
+                raise serializers.ValidationError({"department": err_msg or "Invalid college, department, or academic year combination."})
+
+        return attrs
 
 
 class PlayerRegistrationSerializer(serializers.ModelSerializer):

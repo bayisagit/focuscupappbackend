@@ -195,12 +195,16 @@ class CoachPlayerReviewAPIView(APIView):
             batch_team=team
         )
 
-        new_status = request.data.get('status')
+        raw_status = str(request.data.get('status') or '').strip().upper()
+        if raw_status in ('APPROVE', 'APPROVED'):
+            new_status = 'APPROVED'
+        elif raw_status in ('REJECT', 'REJECTED'):
+            new_status = 'REJECTED'
+        else:
+            return Response({"error": "Status must be APPROVED or REJECTED."}, status=status.HTTP_400_BAD_REQUEST)
+
         reason = request.data.get('reason', '')
         new_jersey = request.data.get('jersey_number')
-
-        if new_status not in ('APPROVED', 'REJECTED'):
-            return Response({"error": "Status must be APPROVED or REJECTED."}, status=status.HTTP_400_BAD_REQUEST)
 
         if new_jersey is not None:
             try:
