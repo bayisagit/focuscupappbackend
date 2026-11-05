@@ -1,4 +1,5 @@
 from rest_framework import status, permissions, generics
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.db import transaction
@@ -56,10 +57,26 @@ class AcademicOptionsAPIView(APIView):
         })
 
 
+class MemberDirectoryPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 500
+
+    def get_page_size(self, request):
+        if (
+            request.query_params.get('all') in ('true', '1') or
+            request.query_params.get('view_all') in ('true', '1') or
+            request.query_params.get('page_size') in ('all', '0', '-1')
+        ):
+            return 500
+        return super().get_page_size(request)
+
+
 class MemberListAPIView(generics.ListAPIView):
     """Searchable & filterable directory of fellowship members."""
     serializer_class = MemberProfileListSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = MemberDirectoryPagination
 
     def get_queryset(self):
         qs = (
