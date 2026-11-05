@@ -51,11 +51,35 @@ class BatchTeamDetailAPIView(APIView):
     """Detailed information, roster, fixtures, and results for an academic batch."""
     def get_permissions(self):
         if self.request.method in ('PATCH', 'PUT'):
-            return [IsTournamentManager()]
+            return [permissions.IsAuthenticated()]
         return [permissions.AllowAny()]
 
     def patch(self, request, batch_code):
         team = get_object_or_404(BatchTeam, batch_code=batch_code)
+
+        is_mgr = bool(
+            request.user.is_authenticated and (
+                request.user.role == 'MANAGER' or
+                getattr(request.user, 'is_manager', False) or
+                request.user.is_staff or
+                request.user.is_superuser
+            )
+        )
+        is_team_coach = False
+        if request.user.is_authenticated:
+            coached_team = getattr(request.user, 'get_coached_batch_team', lambda: None)()
+            if coached_team and coached_team.id == team.id:
+                is_team_coach = True
+            elif team.coach_user_id and team.coach_user_id == request.user.id:
+                is_team_coach = True
+            elif team.coach_member_id and getattr(request.user, 'linked_member_id', None) == team.coach_member_id:
+                is_team_coach = True
+
+        if not (is_mgr or is_team_coach):
+            return Response(
+                {"error": "You do not have permission to edit this batch profile. Only tournament managers and the batch coach can update it."},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
         for field in ['name', 'nickname', 'motto', 'description', 'color_hex', 'team_photo_url', 'logo_url']:
             if field in request.data:
@@ -69,7 +93,7 @@ class BatchTeamDetailAPIView(APIView):
             model_name='BatchTeam',
             object_id=str(team.id),
             object_repr=f"{team.name} ({team.batch_code})",
-            notes=f"Batch profile updated by manager {request.user.username}."
+            notes=f"Batch profile updated by {'manager' if is_mgr else 'coach'} {request.user.username}."
         )
 
         return Response({

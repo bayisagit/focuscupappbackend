@@ -12,15 +12,28 @@ class BatchTeamSerializer(serializers.ModelSerializer):
     coach_name = serializers.CharField(source='coach_member.full_name', read_only=True, allow_null=True)
     coach_photo_url = serializers.CharField(source='coach_member.avatar_url', read_only=True, allow_null=True)
     coach_member_id = serializers.IntegerField(source='coach_member.id', read_only=True, allow_null=True)
+    coach = serializers.SerializerMethodField()
 
     class Meta:
         model = BatchTeam
         fields = [
             'id', 'batch_code', 'name', 'nickname', 'color_hex',
             'logo', 'logo_url', 'team_photo', 'team_photo_url', 'photo_url',
-            'motto', 'description', 'coach_name', 'coach_photo_url', 'coach_member_id',
+            'motto', 'description', 'coach_name', 'coach_photo_url', 'coach_member_id', 'coach',
             'is_competing', 'total_members', 'approved_players', 'created_at'
         ]
+
+    def get_coach(self, obj):
+        if obj.coach_member:
+            return {
+                "id": obj.coach_member.id,
+                "full_name": obj.coach_member.full_name,
+                "photo_url": obj.coach_member.avatar_url,
+                "department": obj.coach_member.department,
+                "jersey_number": obj.coach_member.preferred_jersey_number,
+                "username": obj.coach_user.username if obj.coach_user else "",
+            }
+        return None
 
     def get_total_members(self, obj):
         try:
