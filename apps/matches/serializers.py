@@ -6,17 +6,20 @@ from apps.competitions.serializers import BatchTeamSerializer
 class MatchEventSerializer(serializers.ModelSerializer):
     event_type_display = serializers.CharField(source='get_event_type_display', read_only=True)
     player_name = serializers.CharField(source='player.full_name', read_only=True)
+    player_id = serializers.IntegerField(source='player.id', read_only=True)
     related_player_name = serializers.CharField(source='related_player.full_name', read_only=True)
+    related_player_id = serializers.IntegerField(source='related_player.id', read_only=True)
     team_name = serializers.CharField(source='team.name', read_only=True)
+    team_id = serializers.IntegerField(source='team.id', read_only=True)
     team_batch = serializers.CharField(source='team.batch_code', read_only=True)
 
     class Meta:
         model = MatchEvent
         fields = [
             'id', 'match', 'event_type', 'event_type_display',
-            'team', 'team_name', 'team_batch',
-            'player', 'player_name',
-            'related_player', 'related_player_name',
+            'team', 'team_id', 'team_name', 'team_batch',
+            'player', 'player_id', 'player_name',
+            'related_player', 'related_player_id', 'related_player_name',
             'minute', 'extra_minute', 'description', 'created_at'
         ]
 
